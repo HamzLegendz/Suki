@@ -2,11 +2,11 @@
 Yuki is a lightweight and fast WhatsApp bot plugin script. Run it for Bun.
 
 ## Features
-[x] - Pairing Code
-[x] - Serializer system
-[x] - Fully types for Serializer
-[ ] - Plugin based system (coming soon)
-[ ] - Case system
+- [x] Pairing Code
+- [x] Serializer system
+- [x] Fully types for Serializer
+- [ ] Plugin based system (coming soon)
+- [ ] Case system
 
 > [!NOTE]
 > I didn't do fully typed for some of the code, 
