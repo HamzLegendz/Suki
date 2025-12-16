@@ -89,35 +89,35 @@ export function makeWASocket(
         return {
           info(...args: any) {
             console.log(
-              chalk.bold.bgRgb(51, 204, 51)("INFO "),
+              chalk.bold.bgRgb(51, 204, 51)(" INFO "),
               `[${chalk.rgb(255, 255, 255)(new Date().toUTCString())}]:`,
               chalk.cyan(format(...args)),
             );
           },
           error(...args: any) {
             console.log(
-              chalk.bold.bgRgb(247, 38, 33)("ERROR "),
+              chalk.bold.bgRgb(247, 38, 33)(" ERROR "),
               `[${chalk.rgb(255, 255, 255)(new Date().toUTCString())}]:`,
               chalk.rgb(255, 38, 0)(format(...args)),
             );
           },
           warn(...args: any) {
             console.log(
-              chalk.bold.bgRgb(255, 153, 0)("WARNING "),
+              chalk.bold.bgRgb(255, 153, 0)(" WARNING "),
               `[${chalk.rgb(255, 255, 255)(new Date().toUTCString())}]:`,
               chalk.redBright(format(...args)),
             );
           },
           trace(...args: any) {
             console.log(
-              chalk.grey("TRACE "),
+              chalk.grey(" TRACE "),
               `[${chalk.rgb(255, 255, 255)(new Date().toUTCString())}]:`,
               chalk.white(format(...args)),
             );
           },
           debug(...args: any) {
             console.log(
-              chalk.bold.bgRgb(66, 167, 245)("DEBUG "),
+              chalk.bold.bgRgb(66, 167, 245)(" DEBUG "),
               `[${chalk.rgb(255, 255, 255)(new Date().toUTCString())}]:`,
               chalk.white(format(...args)),
             );
