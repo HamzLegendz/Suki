@@ -3,11 +3,14 @@ import { Browsers, DisconnectReason, makeCacheableSignalKeyStore, useMultiFileAu
 import { Low, JSONFile } from 'lowdb';
 import path from 'path';
 import pino from 'pino';
+import fs from 'node:fs';
 import { fileURLToPath } from 'url';
 import yargs from "yargs";
 import { makeWASocket, serialize, protoType } from './libs/serialize';
 import chalk from "chalk";
 import { tmpdir } from "os";
+import ts from "typescript";
+import chokidar from "chokidar";
 
 function filename(metaUrl = import.meta.url) {
   return fileURLToPath(metaUrl)
@@ -184,6 +187,107 @@ global.reloadHandler = async function(restatConn: boolean) {
   return true
 }
 
-// TODO: Continue to plugin 
+function getAllTsFiles(dirPath: string, arrayOfFiles: string[] = []) {
+  const files = fs.readdirSync(dirPath)
 
-await global.reloadHandler();
+  files.forEach(file => {
+    const fullPath = path.join(dirPath, file);
+    if (fs.statSync(fullPath).isDirectory()) {
+      getAllTsFiles(fullPath, arrayOfFiles);
+    } else if (file.endsWith(".ts")) {
+      arrayOfFiles.push(fullPath);
+    }
+  });
+
+  return arrayOfFiles;
+}
+
+let pluginFolder = path.join(__dirname, "plugins");
+let pluginFilter = (filename: string) => /\.ts$/.test(filename);
+let tsFiles = getAllTsFiles(pluginFolder);
+global.plugins = {}
+
+for (let fullPath of tsFiles) {
+  const filename = path.relative(pluginFolder, fullPath);
+
+  try {
+    const file = path.join(pluginFolder, filename);
+    const module = await import(file)
+    global.plugins[filename] = module.default || module;
+  } catch (e) {
+    console.error(`Failed to load plugins ${filename}: ${e}`);
+    delete global.plugins[filename];
+  }
+}
+
+conn.logger.info(`Loaded ${Object.keys(global.plugins).length} plugins...`);
+
+function checkTsSyntax(code: string, fileName: string) {
+  const result = ts.transpileModule(code, {
+    fileName,
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ESNext,
+    },
+    reportDiagnostics: true,
+  });
+
+  return result.diagnostics ?? [];
+}
+
+global.reload = async (filename: string = "") => {
+  if (!pluginFilter(filename)) return;
+  const relPath = path.relative(pluginFolder, filename);
+  const fullPath = path.resolve(filename)
+
+  const exists = fs.existsSync(fullPath);
+  if (!exists) {
+    conn.logger.warn(`deleted plugin '${relPath}'`);
+    delete global.plugins[relPath];
+    return;
+  } else conn.logger.info(`requiring new plugin '${relPath}'`);
+  const content = fs.readFileSync(fullPath, "utf-8");
+  const diagnostics = checkTsSyntax(content, fullPath);
+
+  if (diagnostics.length) {
+    const msg = diagnostics
+      .map(d =>
+        ts.flattenDiagnosticMessageText(d.messageText, "\n")
+      )
+      .join("\n");
+
+    conn.logger.error(
+      `syntax error while loading '${relPath}'\n${msg}`
+    );
+    return;
+  }
+
+  try {
+    const moduleUrl = `file://${fullPath}?v=${Date.now()}`;
+    const module = await import(moduleUrl);
+    globalThis.plugins[relPath] = module.default || module;
+    globalThis.plugins = Object.fromEntries(
+      Object.entries(globalThis.plugins).sort(([a], [b]) =>
+        a.localeCompare(b)
+      ),
+    );
+
+    conn.logger.info(`reloaded plugin '${relPath}' successfully`);
+  } catch (e) {
+    conn.logger.error(`error importing plugin '${relPath}':\n${e}`);
+  }
+}
+
+const watcher = chokidar.watch(pluginFolder, {
+  persistent: true,
+  ignoreInitial: true,
+  usePolling: false,
+  depth: Infinity,
+  awaitWriteFinish: true,
+});
+
+watcher.on("add", global.reload)
+  .on("change", global.reload)
+  .on("unlink", global.reload);
+
+global.reloadHandler();
