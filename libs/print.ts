@@ -49,7 +49,7 @@ export default async function print(m: ExtendedWAMessage, conn: any, _user?: any
 ╞❴ Other ❵ ${chalk.yellow('%s%s')}
 ╞❴ In chat ❵ ${chalk.green('%s')}
 ╞❴ Chat ❵ ${chalk.black(chalk.bgYellow('%s'))}
-╰╼┈⟐ ❰ Shiya Botz V${pkg.version} ❱
+╰╼┈⟐ ❰ Yuki Botz V${pkg.version} ❱
 `.trim(),
     me + ' ~' + (conn.user?.name || ''),
     (m.messageTimestamp ? new Date(1000 * (typeof m.messageTimestamp === 'number' ? m.messageTimestamp : m.messageTimestamp.low)) : new Date()).toTimeString(),

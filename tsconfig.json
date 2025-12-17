@@ -21,6 +21,10 @@
     "noImplicitAny": false,
     "noImplicitThis": false,    
     "types": ["node", "bun"],
-    "typeRoots": ["types/*.d.ts"]
-  },
+    "typeRoots": ["types/*.d.ts"],
+    "baseUrl": ".",
+    "paths": {
+        "@yuki/types": ["types/pluginType.ts"]
+    }
+  }
 }

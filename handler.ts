@@ -2,6 +2,8 @@ import type { BaileysEventMap } from "baileys"
 import { smsg } from "./libs/serialize";
 import type { ExtendedWAMessage } from "./types/extendWAMessage";
 import util from "node:util";
+import fs, { truncateSync } from "node:fs";
+import { uploader } from "./libs/uploadImage";
 
 const isNumber = (x: number) => typeof x === 'number' && !isNaN(x)
 const delay = (ms: number) => isNumber(ms) && new Promise(resolve => setTimeout(resolve, ms))
@@ -204,7 +206,7 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
       let plugin = global.plugins[name];
       if (!plugin) continue;
       if (plugin.disabled) {
-        await m.reply("Sorry :( This command is currently disabled by the owner");
+        await m.reply("Sorry, This command is currently disabled by the owner :(");
         continue;
       }
       if (typeof plugin.all === "function") {
@@ -376,6 +378,7 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
         isBotAdmin,
         isPrems,
         isBans,
+        delay,
         chatUpdate,
       }
       try {
@@ -459,53 +462,125 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
   }
 }
 
+export async function participantsUpdate({ id, participants, action }: BaileysEventMap["group-participants.update"], simulate: boolean = false) {
+  if (opts["self"]) return;
+  if (this.isInit && !simulate) return
+  if (global.db.data == null)
+    await loadDatabase()
+  let chat = global.db.data.chats[id] || {}
+  let text = ''
+  switch (action) {
+    case 'add':
+    case 'remove':
+      if (chat.welcome) {
+        let groupMetadata = (conn.chats[id] || {}).metadata || await this.groupMetadata(id);
+        for (let user of participants) {
+          if (action === "add") await delay(1000);
+          let userJid = this.getJid(String(user).decodeJid()) || String(user).decodeJid();
+          let pp: any;
+          try {
+            const pps = await this.profilePictureUrl(userJid, 'image').catch(() => 'https://files.catbox.moe/m84nrf.jpg')
+            const ppB = Buffer.from(await (await fetch(pps)).arrayBuffer())
+            if (ppB?.length) pp = await uploader(ppB).catch(() => pps)
+          } catch { } finally {
+            text = (action === 'add' ? (chat.sWelcome || this.welcome || conn.welcome || 'Welcome, @user!').replace('@subject', await this.getName(id)).replace('@desc', groupMetadata.desc ? String.fromCharCode(8206).repeat(4001) + groupMetadata.desc : '') :
+              (chat.sBye || this.bye || conn.bye || 'Bye, @user!')).replace(/@user/g, '@' + user.id.split(`@`)[0])
+            this.sendMessage(id, {
+              text: text,
+              contextInfo: {
+                mentionedJid: [user],
+                externalAdReply: {
+                  showAdAttribution: true,
+                  title: 'DitzDev',
+                  thumbnailUrl: pp,
+                  mediaType: 1,
+                  renderLargerThumbnail: true
+                }
+              }
+            }, { quoted: null })
+          }
+        }
+      }
+      break
+    // ignore fallthrough
+    // @ts-ignore
+    case 'promote':
+      text = (chat.sPromote || this.spromote || conn.spromote || '@user ```is now Admin```')
+    case 'demote':
+      if (!text)
+        text = (chat.sDemote || this.sdemote || conn.sdemote || '@user ```is no longer Admin```')
+      text = text.replace('@user', '@' + (participants[0] as any).split('@')[0])
+      if (chat.detect)
+        this.sendMessage(id, { text, mentions: this.parseMention(text) })
+      break
+  }
+}
 
-global.dfail = (type, m, conn) => {
-    let userss = global.db.data.users[m.sender]
-    let imgr = 'https://files.catbox.moe/0604mz.jpeg'
-    let msg = {
-        rowner: '```Maaf, Fitur Ini Hanya Untuk Creator```',
-        owner: '```Maaf, Fitur ini khusus hanya untuk Owner```',
-        mods: '```Maaf, Fitur Ini hanya untuk Moderator```',
-        group: '```Maaf, Fitur ini hanya dapat di gunakan dalam grup```',
-        private: '```Fitur ini hanya bisa di gunakan di dalam Private Chat!```',
-        admin: null,
-        botAdmin: '```Yuki Blom Jadi Admin, Gabisa pake Fitur itu🥲```',
-        restrict: '```Restrict Dinyalakan pada Chat ini, Harap matikan restrict```',
-        unreg: '```Kamu belum terdaftar, Silahkan daftar terlebih dahulu dengan mengetik:\n.daftar```',
-        premium: '```Fitur Ini hanya bisa di Akses Oleh member premium!```',
-    }[type];
-    if (type === 'admin') {
-        let stickerBuffer = fs.readFileSync('./media/admin.webp');
-        conn.sendMessage(m.chat, { sticker: stickerBuffer }, { quoted: m });
-    } else if (msg) {
-        return conn.sendMessage(
-            m.chat,
-            {
-                text: msg,
-                contextInfo: {
-                    mentionedJid: conn.parseMention(msg),
-                    groupMentions: [],
-                    isForwarded: true,
-                    businessMessageForwardInfo: {
-                        businessOwnerJid: global.owner[0] + "@s.whatsapp.net",
-                    },
-                    forwardingScore: 256,
-                    externalAdReply: {
-                        title: "[ AKSES DI TOLAK ]",
-                        body: 'ACCESS_DANIED',
-                        thumbnailUrl: imgr,
-                        sourceUrl: null,
-                        mediaType: 1,
-                        renderLargerThumbnail: false,
-                    },
-                },
-            },
-            { quoted: m },
-        );
-    }
-    let msg3 = {
-        zevent: `Perintah ini hanya dapat digunakan saat event*!`
-    }[type]
-    if (msg3) return m.reply(msg3)
+export async function groupsUpdate(groupsUpdate: BaileysEventMap["groups.update"]) {
+  if (opts['self']) return
+  for (const groupUpdate of groupsUpdate) {
+    const id = groupUpdate.id
+    if (!id) continue
+    let chats = global.db.data.chats[id],
+      text = ''
+    if (!chats?.detect) continue
+    if (groupUpdate.desc) text = (chats.sDesc || this.sDesc || conn.sDesc || '```Description has been changed to```\n@desc').replace('@desc', groupUpdate.desc)
+    if (groupUpdate.subject) text = (chats.sSubject || this.sSubject || conn.sSubject || '```Subject has been changed to```\n@subject').replace('@subject', groupUpdate.subject)
+    if (groupUpdate.announce == true) text = (chats.sAnnounceOn || this.sAnnounceOn || conn.sAnnounceOn || '*Group has been closed!*')
+    if (groupUpdate.announce == false) text = (chats.sAnnounceOff || this.sAnnounceOff || conn.sAnnounceOff || '*Group has been open!*')
+    if (groupUpdate.restrict == true) text = (chats.sRestrictOn || this.sRestrictOn || conn.sRestrictOn || '*Group has been all participants!*')
+    if (groupUpdate.restrict == false) text = (chats.sRestrictOff || this.sRestrictOff || conn.sRestrictOff || '*Group has been only admin!*')
+    if (!text) continue
+    this.reply(id, text.trim())
+  }
+}
+
+global.dfail = (type: any, m: any, conn: any) => {
+  // let userss = global.db.data.users[m.sender]
+  let imgr = 'https://files.catbox.moe/0604mz.jpeg'
+  let msg = {
+    rowner: '```Maaf, Fitur Ini Hanya Untuk Creator```',
+    owner: '```Maaf, Fitur ini khusus hanya untuk Owner```',
+    mods: '```Maaf, Fitur Ini hanya untuk Moderator```',
+    group: '```Maaf, Fitur ini hanya dapat di gunakan dalam grup```',
+    private: '```Fitur ini hanya bisa di gunakan di dalam Private Chat!```',
+    admin: null,
+    botAdmin: '```Yuki Blom Jadi Admin, Gabisa pake Fitur itu🥲```',
+    restrict: '```Restrict Dinyalakan pada Chat ini, Harap matikan restrict```',
+    unreg: '```Kamu belum terdaftar, Silahkan daftar terlebih dahulu dengan mengetik:\n.daftar```',
+    premium: '```Fitur Ini hanya bisa di Akses Oleh member premium!```',
+  }[type];
+  if (type === 'admin') {
+    let stickerBuffer = fs.readFileSync('./media/admin.webp');
+    conn.sendMessage(m.chat, { sticker: stickerBuffer }, { quoted: m });
+  } else if (msg) {
+    return conn.sendMessage(
+      m.chat,
+      {
+        text: msg,
+        contextInfo: {
+          mentionedJid: conn.parseMention(msg),
+          groupMentions: [],
+          isForwarded: true,
+          businessMessageForwardInfo: {
+            businessOwnerJid: global.owner[0] + "@s.whatsapp.net",
+          },
+          forwardingScore: 256,
+          externalAdReply: {
+            title: "[ AKSES DI TOLAK ]",
+            body: 'ACCESS_DANIED',
+            thumbnailUrl: imgr,
+            sourceUrl: null,
+            mediaType: 1,
+            renderLargerThumbnail: false,
+          },
+        },
+      },
+      { quoted: m },
+    );
+  }
+  let msg3 = {
+    zevent: `Perintah ini hanya dapat digunakan saat event*!`
+  }[type]
+  if (msg3) return m.reply(msg3)
 }

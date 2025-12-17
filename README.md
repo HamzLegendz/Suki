@@ -5,7 +5,7 @@ Yuki is a lightweight and fast WhatsApp bot plugin script. Run it for Bun.
 - [x] Pairing Code
 - [x] Serializer system
 - [x] Fully types for Serializer
-- [ ] Plugin based system (coming soon)
+- [x] Plugin based system
 - [ ] Case system
 
 > [!NOTE]
@@ -38,7 +38,79 @@ bun index.ts
 # or
 bun run index.ts
 ```
-That's it! Your bot is ready to use >\\\<
+That's it! Your bot is ready to use!
+
+## Adding an command
+Yuki Bot is a plugin-based script. All commands are available and will be automatically detected in the [plugins](plugins) folder.
+To get started, you'll need to create a command like this:
+```typescript
+import type { PluginHandler } from "@yuki/types";
+
+let handler: PluginHandler = {
+    name: "Say Hello World!",
+    cmd: ["hello"], // You can use Regex for example: /^(hello)$/i
+    exec: async (m) => {
+      m.reply("Hello World!");
+    }
+}
+// Export it
+export default handler;
+```
+
+### Type plugin
+I've made the full plugin type (maybe?) available in the file [types/pluginType.ts](types/pluginType.ts)
+What will be seen:
+```typescript
+import type { BaileysEventMap } from "baileys";
+import type { ExtendedWAMessage } from "./extendWAMessage";
+import type { ExtendedWASocket } from "./extendWASocket";
+
+interface HandlerContext {
+  conn?: ExtendedWASocket;
+  args?: string[];
+  text?: string;
+  isOwner?: boolean;
+  isROwner?: boolean;
+  user?: any;
+  bot?: any;
+  isRAdmin?: boolean;
+  isAdmin?: boolean;
+  isBotAdmin?: boolean;
+  isPrems?: boolean;
+  isBans?: boolean;
+  delay?(angka: number): Promise<void>;
+  chatUpdate?: BaileysEventMap["messages.upsert"];
+}
+
+export interface PluginHandler {
+  name: string;
+  description?: string;
+  cmd: string[] | RegExp;
+  register?: boolean;
+  tags?: string[];
+  usePrefix?: boolean;
+  help?: string[];
+  group?: boolean;
+  banned?: boolean;
+  premium?: boolean;
+  mods?: boolean;
+  owner?: boolean;
+  rowner?: boolean;
+  admin?: boolean;
+  private?: boolean;
+  limit?: number | boolean;
+  exp?: number;
+  level?: number;
+  disabled?: boolean;
+  customPrefix?: RegExp;
+  exec: (
+    m: ExtendedWAMessage,
+    ctx: HandlerContext
+  ) => Promise<void> | void;
+}
+```
+
+If you have questions or encounter problems or bugs, please visit the [issue](issues) page.
 
 ## License & Contributing
 This script is distributed under the [MIT license.](LICENSE) Feel free to use, modify, or redistribute it. I would be greatly appreciated if you could help me!

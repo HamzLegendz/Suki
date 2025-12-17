@@ -182,11 +182,14 @@ global.reloadHandler = async function(restatConn: boolean) {
   conn.handler = handler.handler.bind(global.conn)
   conn.connectionUpdate = connectionUpdate.bind(global.conn)
   conn.credsUpdate = saveCreds.bind(global.conn)
-
+  conn.participantsUpdate = handler.participantsUpdate.bind(global.conn)
+  conn.groupsUpdate = handler.groupsUpdate.bind(global.conn)
 
   conn.ev.on('messages.upsert', conn.handler)
   conn.ev.on('connection.update', conn.connectionUpdate)
   conn.ev.on('creds.update', conn.credsUpdate)
+  conn.ev.on('group-participants.update', conn.participantsUpdate)
+  conn.ev.on('groups.update', conn.groupsUpdate)
   isInit = false;
   return true
 }
@@ -283,7 +286,7 @@ global.reload = async (filename: string = "") => {
 
   const content = fs.readFileSync(fullPath, "utf-8");
   const contentHash = hashContent(content);
-  
+
   // Check if content actually changed
   // This prevents unnecessary reloads when file is saved without changes
   const lastHash = fileHashes.get(fullPath);
@@ -350,7 +353,7 @@ global.reload = async (filename: string = "") => {
 
     // Extract plugin handler (supports both default and named exports)
     const plugin = moduleObj.exports.default || moduleObj.exports;
-  
+
     global.plugins[relPath] = plugin;
     pluginModules.set(fullPath, plugin);
 
