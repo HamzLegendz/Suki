@@ -21,6 +21,7 @@
     "lowdb": "^3.0.0",
     "node-webpmux": "^3.2.1",
     "pino": "^10.1.0",
+    "url-regex-safe": "^4.0.0",
     "yargs": "^18.0.0"
   }
 }

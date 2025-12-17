@@ -1,44 +1,46 @@
-import type { proto } from "baileys";
+import type { proto, WAMessage } from "baileys";
 import type { MiscMessageGenerationOptions } from "baileys";
-import type { ExtendedWASocket } from "./extendedWASocket";
+import type { ExtendedWASocket } from "./extendWASocket";
 
-export interface ExtendedWAMessage extends proto.IWebMessageInfo {
-  conn: ExtendedWASocket;
+export type ExtendedWAMessage =
+  WAMessage & MiscMessageGenerationOptions & {
+    conn: ExtendedWASocket;
 
-  id: string | null | undefined;
-  isBaileys: boolean;
-  chat: string;
-  isGroup: boolean;
-  sender: string;
-  fromMe: boolean;
-  mtype: string;
-  msg: any;
-  mediaMessage: any;
-  messages: any;
-  mediaType: string | null;
-  
-  _text: string | null;
-  text: string;
-  
-  mentionedJid: string[];
-  name: string | null;
-  
-  device: string;
-  isBot: boolean;
+    id: string | null | undefined;
+    isBaileys: boolean;
+    chat: string;
+    isGroup: boolean;
+    sender: string;
+    fromMe: boolean;
+    mtype: string;
+    msg: any;
+    mediaMessage: any;
+    messages: any;
+    mediaType: string | null;
 
-  quoted: QuotedMessage | null;
+    _text: string | null;
+    text: string;
 
-  download(saveToFile?: boolean): Promise<Buffer>;
-  reply(text: string, chatId?: string, options?: MiscMessageGenerationOptions): Promise<any>;
-  copy(): ExtendedWAMessage;
-  forward(jid: string, force?: boolean, options?: any): Promise<any>;
-  copyNForward(jid: string, forceForward?: boolean, options?: any): Promise<any>;
-  cMod(jid: string, text?: string, sender?: string, options?: any): Promise<any>;
-  getQuotedObj(): ExtendedWAMessage | null;
-  getQuotedMessage: () => ExtendedWAMessage | null;
-  delete(): Promise<any>;
-  react(text: string): Promise<any>;
-}
+    mentionedJid: string[];
+    name: string | null;
+
+    device: string;
+    isBot: boolean;
+
+    quoted: QuotedMessage | null;
+
+    download(saveToFile?: boolean): Promise<Buffer>;
+    reply(text: string, chatId?: string, options?: MiscMessageGenerationOptions): Promise<any>;
+    copy(): ExtendedWAMessage;
+    forward(jid: string, force?: boolean, options?: any): Promise<any>;
+    copyNForward(jid: string, forceForward?: boolean, options?: any): Promise<any>;
+    cMod(jid: string, text?: string, sender?: string, options?: any): Promise<any>;
+    getQuotedObj(): ExtendedWAMessage | null;
+    getQuotedMessage: () => ExtendedWAMessage | null;
+    delete(): Promise<any>;
+    react(text: string): Promise<any>;
+    [key: string]: any;
+  }
 
 export interface QuotedMessage {
   mtype: string;
@@ -57,7 +59,7 @@ export interface QuotedMessage {
   fakeObj: proto.IWebMessageInfo;
   device: string;
   isBot: boolean;
-  
+
   command: {
     command: string;
     args: string[];

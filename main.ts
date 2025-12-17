@@ -12,6 +12,8 @@ import { tmpdir } from "os";
 import ts from "typescript";
 import chokidar from "chokidar";
 import cp from "node:child_process";
+import { pathToFileURL } from "node:url";
+import crypto from 'node:crypto';
 
 function filename(metaUrl = import.meta.url) {
   return fileURLToPath(metaUrl)
@@ -22,7 +24,6 @@ function dirname(metaUrl = import.meta.url) {
 }
 
 global.__dirname = dirname();
-global.__filename = filename();
 
 serialize();
 protoType();
@@ -236,18 +237,61 @@ function checkTsSyntax(code: string, fileName: string) {
   return result.diagnostics ?? [];
 }
 
+// Store file content hashes to detect actual content changes
+// We use MD5 hashes instead of timestamps because
+// Some editors don't update mtime on every save,
+// File systems may have timestamp precision issues,
+// and Content hash is more reliable for detecting real changes
+const fileHashes = new Map<string, string>();
+const pluginModules = new Map<string, any>();
+
+function hashContent(content: string): string {
+  return crypto.createHash('md5').update(content).digest('hex');
+}
+
+/**
+ * In Bun with cluster setup, module caching is very aggressive.
+ * Traditional dynamic import() with query strings doesn't bypass the cache.
+ * So we use this approach:
+ * - Read file content directly
+ * - Check if content actually changed (via hash comparison)
+ * - Transpile TypeScript to CommonJS
+ * - Execute in isolated scope using Function constructor
+ * 
+ * Every time a change is made to this file, it is hash signed, so it remains safe from memory leaks.
+ * 
+ * This allows true hot reload without worker restart, making development
+ * much faster and avoiding connection drops to WhatsApp.
+ * https://github.com/oven-sh/bun/issues/14435
+ */
 global.reload = async (filename: string = "") => {
   if (!pluginFilter(filename)) return;
+
   const relPath = path.relative(pluginFolder, filename);
-  const fullPath = path.resolve(filename)
+  const fullPath = path.resolve(filename);
 
   const exists = fs.existsSync(fullPath);
   if (!exists) {
     conn.logger.warn(`deleted plugin '${relPath}'`);
     delete global.plugins[relPath];
+    fileHashes.delete(fullPath);
+    pluginModules.delete(fullPath);
     return;
-  } else conn.logger.info(`requiring new plugin '${relPath}'`);
+  }
+
   const content = fs.readFileSync(fullPath, "utf-8");
+  const contentHash = hashContent(content);
+  
+  // Check if content actually changed
+  // This prevents unnecessary reloads when file is saved without changes
+  const lastHash = fileHashes.get(fullPath);
+  if (lastHash === contentHash) {
+    return;
+  }
+
+  fileHashes.set(fullPath, contentHash);
+  conn.logger.info(`requiring new plugin '${relPath}'`);
+
   const diagnostics = checkTsSyntax(content, fullPath);
 
   if (diagnostics.length) {
@@ -258,24 +302,64 @@ global.reload = async (filename: string = "") => {
       .join("\n");
 
     conn.logger.error(
-      `syntax error while loading '${relPath}'\n${msg}`
+      `syntax error while loading '${relPath}':\n${msg}`
     );
+
+    delete global.plugins[relPath];
     return;
   }
 
   try {
-    const moduleUrl = `file://${fullPath}?v=${Date.now()}`;
-    const module = await import(moduleUrl);
-    globalThis.plugins[relPath] = module.default || module;
-    globalThis.plugins = Object.fromEntries(
-      Object.entries(globalThis.plugins).sort(([a], [b]) =>
-        a.localeCompare(b)
-      ),
+    delete global.plugins[relPath];
+
+    // Transpile TypeScript to CommonJS
+    // We use CommonJS because Function constructor expects
+    // module.exports, not ESM export syntax
+    const result = ts.transpileModule(content, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2020,
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      },
+    });
+
+    const moduleExports: any = {};
+    const moduleObj = { exports: moduleExports };
+
+    // Execute transpiled code in isolated scope
+    // This bypasses Bun's module cache completely
+    const moduleFactory = new Function(
+      'require',
+      'exports',
+      'module',
+      '__filename',
+      '__dirname',
+      result.outputText
     );
+
+    moduleFactory(
+      require,
+      moduleExports,
+      moduleObj,
+      fullPath,
+      path.dirname(fullPath)
+    );
+
+    // Extract plugin handler (supports both default and named exports)
+    const plugin = moduleObj.exports.default || moduleObj.exports;
+  
+    global.plugins[relPath] = plugin;
+    pluginModules.set(fullPath, plugin);
 
     conn.logger.info(`reloaded plugin '${relPath}' successfully`);
   } catch (e) {
     conn.logger.error(`error importing plugin '${relPath}':\n${e}`);
+    delete global.plugins[relPath];
+  } finally {
+    global.plugins = Object.fromEntries(
+      Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b))
+    );
   }
 }
 
@@ -284,12 +368,20 @@ const watcher = chokidar.watch(pluginFolder, {
   ignoreInitial: true,
   usePolling: false,
   depth: Infinity,
-  awaitWriteFinish: true,
+  awaitWriteFinish: {
+    stabilityThreshold: 300,
+    pollInterval: 100
+  },
 });
 
-watcher.on("add", global.reload)
-  .on("change", global.reload)
-  .on("unlink", global.reload);
+watcher.on("change", global.reload)
+  .on("add", global.reload)
+  .on("unlink", (filepath) => {
+    const relPath = path.relative(pluginFolder, filepath);
+    delete global.plugins[relPath];
+    fileHashes.delete(path.resolve(filepath));
+    pluginModules.delete(path.resolve(filepath));
+  });
 
 global.reloadHandler();
 

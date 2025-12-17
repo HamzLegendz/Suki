@@ -1,6 +1,12 @@
-// Ini adalah file example
-// untuk menggunakan file ini cukup
-// ubah jadi index.ts 
+// This is an example file
+// to use this file simply
+// change to index.ts 
 
-// Ubah ke nomor pairing kamu
+// Change to your pairing number
 global.pairing = '6285123456'
+global.owner = [
+    ['62851xxxx'],
+    ['62851xxxx'],
+    ['62851xxxx', 'DitzDev', 'contact@ditzdev.my.id', true]
+] // Put your number here for owner
+global.mods = ['62851xxxx'] // Moderator

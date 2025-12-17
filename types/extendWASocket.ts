@@ -33,7 +33,7 @@ export interface ExtendedWASocket extends WASocket {
   logger: Logger;
 
   getFile(PATH: any, saveToFile?: boolean): Promise<FileResult>;
-
+  getName(jid?: string, withoutContact?: false): Promise<string>;
   waitEvent(
     eventName: string,
     is?: (arg: any) => boolean,
