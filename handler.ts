@@ -458,3 +458,54 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
       ).catch(() => { });
   }
 }
+
+
+global.dfail = (type, m, conn) => {
+    let userss = global.db.data.users[m.sender]
+    let imgr = 'https://files.catbox.moe/0604mz.jpeg'
+    let msg = {
+        rowner: '```Maaf, Fitur Ini Hanya Untuk Creator```',
+        owner: '```Maaf, Fitur ini khusus hanya untuk Owner```',
+        mods: '```Maaf, Fitur Ini hanya untuk Moderator```',
+        group: '```Maaf, Fitur ini hanya dapat di gunakan dalam grup```',
+        private: '```Fitur ini hanya bisa di gunakan di dalam Private Chat!```',
+        admin: null,
+        botAdmin: '```Yuki Blom Jadi Admin, Gabisa pake Fitur itu🥲```',
+        restrict: '```Restrict Dinyalakan pada Chat ini, Harap matikan restrict```',
+        unreg: '```Kamu belum terdaftar, Silahkan daftar terlebih dahulu dengan mengetik:\n.daftar```',
+        premium: '```Fitur Ini hanya bisa di Akses Oleh member premium!```',
+    }[type];
+    if (type === 'admin') {
+        let stickerBuffer = fs.readFileSync('./media/admin.webp');
+        conn.sendMessage(m.chat, { sticker: stickerBuffer }, { quoted: m });
+    } else if (msg) {
+        return conn.sendMessage(
+            m.chat,
+            {
+                text: msg,
+                contextInfo: {
+                    mentionedJid: conn.parseMention(msg),
+                    groupMentions: [],
+                    isForwarded: true,
+                    businessMessageForwardInfo: {
+                        businessOwnerJid: global.owner[0] + "@s.whatsapp.net",
+                    },
+                    forwardingScore: 256,
+                    externalAdReply: {
+                        title: "[ AKSES DI TOLAK ]",
+                        body: 'ACCESS_DANIED',
+                        thumbnailUrl: imgr,
+                        sourceUrl: null,
+                        mediaType: 1,
+                        renderLargerThumbnail: false,
+                    },
+                },
+            },
+            { quoted: m },
+        );
+    }
+    let msg3 = {
+        zevent: `Perintah ini hanya dapat digunakan saat event*!`
+    }[type]
+    if (msg3) return m.reply(msg3)
+}
