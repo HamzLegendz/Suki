@@ -10,3 +10,11 @@ global.owner = [
     ['62851xxxx', 'DitzDev', 'contact@ditzdev.my.id', true]
 ] // Put your number here for owner
 global.mods = ['62851xxxx'] // Moderator
+
+global.APIs = {
+  /* your_apikey: "https://api.website" */
+}
+
+global.APIKeys = {
+  // 'https://website': 'apikey'
+}
