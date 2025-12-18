@@ -47,5 +47,5 @@ export interface PluginHandler {
   exec: (
     m: ExtendedWAMessage,
     ctx: HandlerContext
-  ) => Promise<void> | void;
+  ) => Promise<any> | void;
 }

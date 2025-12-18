@@ -8,10 +8,10 @@ let handler: PluginHandler = {
   cmd: /^(tiktok|tt|tiktokdl|tiktoknowm)$/i,
   limit: true,
   register: true,
-  exec: async (m, { conn, text, usedPrefix }) => {
+  exec: async (m, { conn, text, usedPrefix, command }) => {
     if (!text) {
       conn!!.sendPresenceUpdate("composing", m.chat)
-      return conn!!.reply(m.chat, `*Example :* ${usedPrefix}tiktok https://vm.tiktok.com/xxxxx`, m)
+      return conn!!.reply(m.chat, `*Example :* ${usedPrefix!! + command!!} https://vm.tiktok.com/xxxxx`, m)
     }
     if (!text.match(/tiktok/gi)) {
       return conn!!.reply(m.chat, 'Make sure the link is from TikTok', m)
