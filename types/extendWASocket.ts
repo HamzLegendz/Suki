@@ -5,6 +5,8 @@ import type {
   proto
 } from "baileys";
 import type { ILogger } from "baileys/lib/Utils/logger";
+import type { ButtonParams, InteractiveMessageContent, ListSection, SendButtonOptions, SendListOptions } from "./buttons/interactive_message_button";
+import type { ExtendedWAMessage } from "./extendWAMessage";
 
 export interface Logger extends ILogger {
   info(...args: any[]): void;
@@ -45,6 +47,47 @@ export interface ExtendedWASocket extends WASocket {
     maxTries?: number,
     timeoutMs?: number
   ): Promise<any>;
+
+  sendInteractiveMessage(
+    jid: string,
+    content: InteractiveMessageContent,
+    options?: SendButtonOptions
+  ): Promise<ExtendedWAMessage>;
+
+  sendButton(
+    jid: string,
+    text: string,
+    buttons: ButtonParams[],
+    quoted?: MiscMessageGenerationOptions,
+    options?: SendButtonOptions
+  ): Promise<ExtendedWAMessage>;
+
+  sendButtonWithImage(
+    jid: string,
+    image: Buffer | string | { url: string },
+    caption: string,
+    buttons: ButtonParams[],
+    quoted?: MiscMessageGenerationOptions,
+    options?: SendButtonOptions
+  ): Promise<ExtendedWAMessage>;
+
+  sendButtonWithVideo(
+    jid: string,
+    video: Buffer | string | { url: string },
+    caption: string,
+    buttons: ButtonParams[],
+    quoted?: MiscMessageGenerationOptions,
+    options?: SendButtonOptions
+  ): Promise<ExtendedWAMessage>;
+
+  sendList(
+    jid: string,
+    text: string,
+    buttonText: string,
+    sections: ListSection[],
+    quoted?: MiscMessageGenerationOptions,
+    options?: SendListOptions
+  ): Promise<ExtendedWAMessage>;
 
   sendFile(
     jid: string,

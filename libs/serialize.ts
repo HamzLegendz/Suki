@@ -8,9 +8,14 @@ import _makeWASockets, {
   downloadContentFromMessage,
   extractMessageContent,
   generateForwardMessageContent,
+  generateMessageID,
+  generateMessageIDV2,
   generateWAMessageFromContent,
   getDevice,
+  isJidGroup,
   jidDecode,
+  normalizeMessageContent,
+  prepareWAMessageMedia,
   proto,
   WAMessageStubType,
 } from "baileys";
@@ -26,6 +31,177 @@ import { Jimp, JimpMime } from "jimp";
 import store from "./store.ts";
 import type { ExtendedWASocket } from "../types/extendWASocket";
 import type { ExtendedWAMessage } from "../types/extendWAMessage";
+
+// A code for button support from shannz, thanks to him
+// repo: https://github.com/Shannzx10/KurumiSaki/
+function buildInteractiveButtons(buttons: any[] = []) {
+  return buttons.map((b, i) => {
+    if (b && b.name && b.buttonParamsJson) return b;
+    if (b && (b.id || b.text)) {
+      return {
+        name: 'quick_reply',
+        buttonParamsJson: JSON.stringify({
+          display_text: b.text || b.displayText || 'Button ' + (i + 1),
+          id: b.id || ('quick_' + (i + 1))
+        })
+      };
+    }
+    if (b && b.buttonId && b.buttonText?.displayText) {
+      return {
+        name: 'quick_reply',
+        buttonParamsJson: JSON.stringify({
+          display_text: b.buttonText.displayText,
+          id: b.buttonId
+        })
+      };
+    }
+    return b;
+  });
+}
+
+function getButtonArgs(message: any) {
+  const nativeFlow = message.interactiveMessage?.nativeFlowMessage;
+  const firstButtonName = nativeFlow?.buttons?.[0]?.name;
+  const nativeFlowSpecials = [
+    'mpm', 'cta_catalog', 'send_location',
+    'call_permission_request', 'wa_payment_transaction_details',
+    'automated_greeting_message_view_catalog'
+  ];
+
+  if (nativeFlow && (firstButtonName === 'review_and_pay' || firstButtonName === 'payment_info')) {
+    return {
+      tag: 'biz',
+      attrs: {
+        native_flow_name: firstButtonName === 'review_and_pay' ? 'order_details' : firstButtonName
+      }
+    };
+  } else if (nativeFlow && nativeFlowSpecials.includes(firstButtonName)) {
+    return {
+      tag: 'biz',
+      attrs: {},
+      content: [{
+        tag: 'interactive',
+        attrs: {
+          type: 'native_flow',
+          v: '1'
+        },
+        content: [{
+          tag: 'native_flow',
+          attrs: {
+            v: '2',
+            name: firstButtonName
+          }
+        }]
+      }]
+    };
+  } else if (nativeFlow || message.buttonsMessage) {
+    return {
+      tag: 'biz',
+      attrs: {},
+      content: [{
+        tag: 'interactive',
+        attrs: {
+          type: 'native_flow',
+          v: '1'
+        },
+        content: [{
+          tag: 'native_flow',
+          attrs: {
+            v: '9',
+            name: 'mixed'
+          }
+        }]
+      }]
+    };
+  } else if (message.listMessage) {
+    return {
+      tag: 'biz',
+      attrs: {},
+      content: [{
+        tag: 'list',
+        attrs: {
+          v: '2',
+          type: 'product_list'
+        }
+      }]
+    };
+  } else {
+    return {
+      tag: 'biz',
+      attrs: {}
+    };
+  }
+}
+
+async function convertToInteractiveMessage(sock: any, content: any) {
+  if (content.interactiveButtons && content.interactiveButtons.length > 0) {
+    const interactiveMessage: any = {
+      nativeFlowMessage: {
+        buttons: content.interactiveButtons.map(btn => ({
+          name: btn.name || 'quick_reply',
+          buttonParamsJson: btn.buttonParamsJson
+        }))
+      }
+    };
+
+    if (content.image || content.video || content.document) {
+      const mediaType = content.image ? 'image' : content.video ? 'video' : 'document';
+      const mediaContent = content[mediaType];
+
+      try {
+        const prepared = await prepareWAMessageMedia(
+          { [mediaType]: mediaContent } as any,
+          { upload: sock.waUploadToServer }
+        );
+
+        if (mediaType === 'image' && prepared.imageMessage) {
+          interactiveMessage.header = {
+            hasMediaAttachment: true,
+            imageMessage: prepared.imageMessage
+          };
+        } else if (mediaType === 'video' && prepared.videoMessage) {
+          interactiveMessage.header = {
+            hasMediaAttachment: true,
+            videoMessage: prepared.videoMessage
+          };
+        } else if (mediaType === 'document' && prepared.documentMessage) {
+          interactiveMessage.header = {
+            hasMediaAttachment: true,
+            documentMessage: prepared.documentMessage
+          };
+        }
+      } catch (error) {
+        console.error('Failed to prepare media:', error);
+        throw error;
+      }
+    } else if (content.title || content.subtitle) {
+      interactiveMessage.header = {
+        title: content.title || content.subtitle || ''
+      };
+    }
+
+    if (content.caption || content.text) {
+      interactiveMessage.body = { text: content.caption || content.text };
+    }
+    if (content.footer) {
+      interactiveMessage.footer = { text: content.footer };
+    }
+
+    const newContent = { ...content };
+    delete newContent.interactiveButtons;
+    delete newContent.title;
+    delete newContent.subtitle;
+    delete newContent.text;
+    delete newContent.caption;
+    delete newContent.footer;
+    delete newContent.image;
+    delete newContent.video;
+    delete newContent.document;
+
+    return { ...newContent, interactiveMessage };
+  }
+  return content;
+}
 
 export function makeWASocket(
   config: UserFacingSocketConfig,
@@ -437,6 +613,181 @@ END:VCARD`.trim();
           .getBuffer(JimpMime.jpeg);
         return kiyomasa;
       },
+    },
+    sendInteractiveMessage: {
+      async value(
+        jid: string,
+        content: any,
+        options: any = {}
+      ) {
+        const relayMessage = conn.relayMessage;
+        const genMsgId = generateMessageIDV2 || generateMessageID;
+        if (!generateWAMessageFromContent || !normalizeMessageContent || !isJidGroup || !genMsgId || !relayMessage) {
+          throw new Error('Missing baileys internals');
+        }
+
+        const convertedContent = await convertToInteractiveMessage(conn, content);
+
+        const userJid = conn.authState?.creds?.me?.id || conn.user?.id || conn.user?.jid;
+        const fullMsg = generateWAMessageFromContent(jid, convertedContent, {
+          logger: conn.logger,
+          userJid,
+          messageId: genMsgId(userJid),
+          timestamp: new Date(),
+          ...options
+        });
+
+        const normalizedContent = normalizeMessageContent(fullMsg.message);
+        const buttonArgs = getButtonArgs(normalizedContent);
+        const isPrivate = !isJidGroup(jid);
+
+        let additionalNodes = [...(options.additionalNodes || [])];
+        additionalNodes.push(buttonArgs);
+
+        if (isPrivate && options.useAI === true) {
+          additionalNodes.push({ tag: 'bot', attrs: { biz_bot: '1' } });
+        }
+
+        await relayMessage(jid, fullMsg.message, {
+          messageId: fullMsg.key.id,
+          useCachedGroupMetadata: options.useCachedGroupMetadata,
+          additionalAttributes: options.additionalAttributes || {},
+          statusJidList: options.statusJidList,
+          additionalNodes
+        });
+
+        const isPrivateChat = !isJidGroup(jid);
+        if (conn.config?.emitOwnEvents && isPrivateChat) {
+          process.nextTick(() => {
+            if (conn.processingMutex?.mutex && conn.upsertMessage) {
+              conn.processingMutex.mutex(() => conn.upsertMessage(fullMsg, 'append'));
+            }
+          });
+        }
+
+        return fullMsg;
+      }
+    },
+
+    sendButton: {
+      async value(
+        jid: string,
+        text: string,
+        buttons: any[] = [],
+        quoted?: any,
+        options: any = {}
+      ) {
+        const {
+          caption = '',
+          footer = '',
+          title,
+          subtitle,
+          image,
+          video,
+          document
+        } = options;
+
+        const interactiveButtons = buildInteractiveButtons(buttons);
+        const payload: any = {
+          text: text || caption,
+          caption: caption || text,
+          footer,
+          interactiveButtons
+        };
+
+        if (title) payload.title = title;
+        if (subtitle) payload.subtitle = subtitle;
+        if (image) payload.image = image;
+        if (video) payload.video = video;
+        if (document) payload.document = document;
+
+        const sendOptions: any = { ...options };
+        if (quoted && quoted.key) {
+          sendOptions.quoted = quoted;
+        }
+
+        return conn.sendInteractiveMessage(jid, payload, sendOptions);
+      }
+    },
+    sendButtonWithImage: {
+      async value(
+        jid: string,
+        image: any,
+        caption: string,
+        buttons: any[],
+        quoted?: any,
+        options: any = {}
+      ) {
+        return conn.sendButton(jid, caption, buttons, quoted, {
+          ...options,
+          image
+        });
+      }
+    },
+    sendButtonWithVideo: {
+      async value(
+        jid: string,
+        video: any,
+        caption: string,
+        buttons: any[],
+        quoted?: any,
+        options: any = {}
+      ) {
+        return conn.sendButton(jid, caption, buttons, quoted, {
+          ...options,
+          video
+        });
+      }
+    },
+
+    sendList: {
+      async value(
+        jid: string,
+        text: string,
+        buttonText: string,
+        sections: any[],
+        quoted?: any,
+        options: any = {}
+      ) {
+        const { footer = '', title } = options;
+
+        const listMessage = proto.Message.ListMessage.create({
+          title: title || text,
+          description: text,
+          buttonText: buttonText || 'Click Here',
+          footerText: footer,
+          listType: proto.Message.ListMessage.ListType.SINGLE_SELECT,
+          sections: sections.map(section => ({
+            title: section.title || 'Section',
+            rows: section.rows.map((row: any) => ({
+              title: row.title || '',
+              description: row.description || '',
+              rowId: row.rowId || row.id || ''
+            }))
+          }))
+        });
+
+        const userJid = conn.user?.jid || conn.user?.id;
+
+        const msgOptions: any = { userJid };
+        if (quoted && quoted.key) {
+          msgOptions.quoted = quoted;
+        }
+
+        const msg = generateWAMessageFromContent(jid, {
+          listMessage
+        }, msgOptions);
+
+        const normalizedContent = normalizeMessageContent(msg.message);
+        const buttonArgs = getButtonArgs(normalizedContent);
+
+        await conn.relayMessage(jid, msg.message, {
+          messageId: msg.key.id,
+          additionalNodes: [buttonArgs]
+        });
+
+        return msg;
+      }
     },
     reply: {
       value(

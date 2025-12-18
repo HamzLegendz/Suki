@@ -24,7 +24,7 @@ interface HandlerContext {
 }
 
 export interface PluginHandler {
-  name: string;
+  name?: string;
   description?: string;
   cmd: string[] | RegExp;
   register?: boolean;
