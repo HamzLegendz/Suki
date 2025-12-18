@@ -13,6 +13,7 @@ import ts from "typescript";
 import chokidar from "chokidar";
 import cp from "node:child_process";
 import crypto from 'node:crypto';
+import { commandCache } from "libs/commandCache";
 
 function filename(metaUrl = import.meta.url) {
   return fileURLToPath(metaUrl)
@@ -100,23 +101,23 @@ async function connectionUpdate(update: any) {
   }
 
   if (connection == 'connecting') {
-    console.log(chalk.redBright('Activating Bot, Please wait a moment...'));
+    conn.logger.warn('Activating Bot, Please wait a moment...');
   } else if (connection == 'open') {
-    console.log(chalk.green('✅ Connected'));
+    conn.logger.info('✅ Connected');
   }
 
   if (isOnline == true) {
-    console.log(chalk.green('Active Status'));
+    conn.logger.info('Active Status');
   } else if (isOnline == false) {
-    console.log(chalk.red('Dead Status'));
+    conn.logger.error('Dead Status');
   }
 
   if (receivedPendingNotifications) {
-    console.log(chalk.yellow('Waiting for New Messages'));
+    conn.logger.warn('Waiting for New Messages');
   }
 
   if (connection == 'close') {
-    console.log(chalk.red('Connection lost & trying to reconnect...'));
+    conn.logger.error('Connection lost & trying to reconnect...');
   }
 
   if (lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut) {
@@ -203,6 +204,8 @@ for (let fullPath of tsFiles) {
     delete global.plugins[filename];
   }
 }
+
+commandCache.build(global.plugins)
 
 conn.logger.info(`Loaded ${Object.keys(global.plugins).length} plugins...`);
 
@@ -335,6 +338,7 @@ global.reload = async (filename: string = "") => {
     pluginModules.set(fullPath, plugin);
 
     conn.logger.info(`reloaded plugin '${relPath}' successfully`);
+    commandCache.build(global.plugins)
   } catch (e) {
     conn.logger.error(`error importing plugin '${relPath}':\n${e}`);
     delete global.plugins[relPath];

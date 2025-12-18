@@ -6,7 +6,7 @@ Yuki is a lightweight and fast WhatsApp bot plugin script. Run it for Bun.
 - [x] Serializer system
 - [x] Fully types for Serializer
 - [x] Plugin based system
-- [x] Interactive message support (Not yet implemented the response handler)
+- [x] Interactive message support
 - [ ] Case system
 
 > [!NOTE]
@@ -59,58 +59,7 @@ export default handler;
 ```
 
 ### Type plugin
-I've made the full plugin type (maybe?) available in the file [types/pluginType.ts](types/pluginType.ts)
-What will be seen:
-```typescript
-import type { BaileysEventMap } from "baileys";
-import type { ExtendedWAMessage } from "./extendWAMessage";
-import type { ExtendedWASocket } from "./extendWASocket";
-
-interface HandlerContext {
-  conn?: ExtendedWASocket;
-  args?: string[];
-  text?: string;
-  isOwner?: boolean;
-  isROwner?: boolean;
-  user?: any;
-  bot?: any;
-  isRAdmin?: boolean;
-  isAdmin?: boolean;
-  isBotAdmin?: boolean;
-  isPrems?: boolean;
-  isBans?: boolean;
-  delay?(angka: number): Promise<void>;
-  chatUpdate?: BaileysEventMap["messages.upsert"];
-}
-
-export interface PluginHandler {
-  name: string;
-  description?: string;
-  cmd: string[] | RegExp;
-  register?: boolean;
-  tags?: string[];
-  usePrefix?: boolean;
-  help?: string[];
-  group?: boolean;
-  banned?: boolean;
-  premium?: boolean;
-  mods?: boolean;
-  owner?: boolean;
-  rowner?: boolean;
-  admin?: boolean;
-  private?: boolean;
-  limit?: number | boolean;
-  exp?: number;
-  level?: number;
-  disabled?: boolean;
-  customPrefix?: RegExp;
-  exec: (
-    m: ExtendedWAMessage,
-    ctx: HandlerContext
-  ) => Promise<void> | void;
-}
-```
-
+I've made the full plugin type (maybe?) available in the file [types/pluginType.ts](types/pluginType.ts).
 If you have questions or encounter problems or bugs, please visit the [issue](https://github.com/OhMyDitzzy/Yuki/issues) page.
 
 ## License & Contributing
