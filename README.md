@@ -1,5 +1,18 @@
-# Yuki Souo
-Yuki is a lightweight and fast WhatsApp bot plugin script. Run it for Bun.
+<div align="center">
+    
+<img src="https://files.catbox.moe/7n4axc.png" alt="Yuki Banner" />
+    
+<h1 align="center">Yuki Souo</h1>
+
+![Bun](https://img.shields.io/badge/Bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white)
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+<img src="https://img.shields.io/static/v1?label=speed&message=fast&color=success" alt="Yuki Speed" />
+
+Yuki is a modern and sophisticated open-source WhatsApp bot script that is fast and memory leak-proof. Yuki also runs exclusively for [Bun](https://bun.com) and is free to modify and redistribute at <code>no cost.</code>
+    
+</div>
+
+---
 
 ## Features
 - [x] Pairing Code
@@ -16,7 +29,7 @@ Yuki is a lightweight and fast WhatsApp bot plugin script. Run it for Bun.
 
 ## Installation
 You'll need to clone this repository. However, [Bun](https://bun.com) must be installed on your computer.
-1. Step the repository:
+1. First step is clone the repository:
 ```bash
 git clone https://github.com/OhMyDitzzdev/Yuki
 ```

@@ -3,6 +3,7 @@ import type { PluginHandler } from "@yuki/types";
 let handler: PluginHandler = {
   name: "Media to sticker converter",
   description: "Convert media, whether video or image, into stickers",
+  tags: ["media"],
   cmd: /^s(tic?ker)?(gif)?$/i,
   register: true,
   limit: 1,
