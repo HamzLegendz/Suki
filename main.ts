@@ -256,26 +256,26 @@ global.reload = async (filename: string = "") => {
   const fullPath = path.resolve(filename);
 
   const exists = fs.existsSync(fullPath);
+
   if (!exists) {
     conn.logger.warn(`deleted plugin '${relPath}'`);
     delete global.plugins[relPath];
     fileHashes.delete(fullPath);
     pluginModules.delete(fullPath);
+    commandCache.build(global.plugins);
     return;
   }
 
   const content = fs.readFileSync(fullPath, "utf-8");
   const contentHash = hashContent(content);
 
-  // Check if content actually changed
-  // This prevents unnecessary reloads when file is saved without changes
   const lastHash = fileHashes.get(fullPath);
   if (lastHash === contentHash) {
     return;
   }
 
   fileHashes.set(fullPath, contentHash);
-  conn.logger.info(`requiring new plugin '${relPath}'`);
+  conn.logger.info(`re-require plugin '${relPath}'`);
 
   const diagnostics = checkTsSyntax(content, fullPath);
 
@@ -297,23 +297,26 @@ global.reload = async (filename: string = "") => {
   try {
     delete global.plugins[relPath];
 
-    // Transpile TypeScript to CommonJS
-    // We use CommonJS because Function constructor expects
-    // module.exports, not ESM export syntax
+    // At first, I was confused as to why there were 
+    // always errors related to import. However, I
+    // noticed an issue at https://github.com/oven-sh/bun/issues/6082
+    // That way, the decision to transpile to CommonJS 
+    // is the right decision. We can still use imports,
+    // global variables like __dirname and so on 
+    // without any problems. But, Transpile 
+    // Changes will only affect plugin change triggers.
     const result = ts.transpileModule(content, {
       compilerOptions: {
-        module: ts.ModuleKind.CommonJS,
-        target: ts.ScriptTarget.ES2020,
+        module: ts.ModuleKind.CommonJS,   // CommonJs
+        target: ts.ScriptTarget.ES2020, // ES2020
         esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
+        allowSyntheticDefaultImports: true
       },
     });
 
     const moduleExports: any = {};
     const moduleObj = { exports: moduleExports };
 
-    // Execute transpiled code in isolated scope
-    // This bypasses Bun's module cache completely
     const moduleFactory = new Function(
       'require',
       'exports',
@@ -331,16 +334,15 @@ global.reload = async (filename: string = "") => {
       path.dirname(fullPath)
     );
 
-    // Extract plugin handler (supports both default and named exports)
     const plugin = moduleObj.exports.default || moduleObj.exports;
 
     global.plugins[relPath] = plugin;
     pluginModules.set(fullPath, plugin);
 
     conn.logger.info(`reloaded plugin '${relPath}' successfully`);
-    commandCache.build(global.plugins)
+    commandCache.build(global.plugins);
   } catch (e) {
-    conn.logger.error(`error importing plugin '${relPath}':\n${e}`);
+    conn.logger.error(`error require plugin '${relPath}'\n${e}'`);
     delete global.plugins[relPath];
   } finally {
     global.plugins = Object.fromEntries(
@@ -360,14 +362,10 @@ const watcher = chokidar.watch(pluginFolder, {
   },
 });
 
-watcher.on("change", global.reload)
+watcher
+  .on("change", global.reload)
   .on("add", global.reload)
-  .on("unlink", (filepath) => {
-    const relPath = path.relative(pluginFolder, filepath);
-    delete global.plugins[relPath];
-    fileHashes.delete(path.resolve(filepath));
-    pluginModules.delete(path.resolve(filepath));
-  });
+  .on("unlink", global.reload);
 
 global.reloadHandler();
 
