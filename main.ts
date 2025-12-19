@@ -13,7 +13,7 @@ import ts from "typescript";
 import chokidar from "chokidar";
 import cp from "node:child_process";
 import crypto from 'node:crypto';
-import { commandCache } from "libs/commandCache";
+import { commandCache } from "./libs/commandCache";
 
 function filename(metaUrl = import.meta.url) {
   return fileURLToPath(metaUrl)
@@ -28,6 +28,7 @@ global.__dirname = dirname();
 serialize();
 protoType();
 
+global.commandCache = commandCache;
 global.API = (name, path = '/', query = {}, apikeyqueryname) => (name in global.APIs ? global.APIs[name] : name) + path + (query || apikeyqueryname ? '?' + new URLSearchParams(Object.entries({ ...query, ...(apikeyqueryname ? { [apikeyqueryname]: global.APIKeys[name in global.APIs ? global.APIs[name] : name] } : {}) })) : '')
 
 global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse());

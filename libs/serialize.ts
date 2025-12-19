@@ -759,7 +759,9 @@ END:VCARD`.trim();
           listType: proto.Message.ListMessage.ListType.SINGLE_SELECT,
           sections: sections.map(section => ({
             title: section.title || 'Section',
+            ...(section.highlight_label ? { highlight_label: section.highlight_label } : {}),
             rows: section.rows.map((row: any) => ({
+              ...(section.header ? { header: section.header } : {}),
               title: row.title || '',
               description: row.description || '',
               rowId: row.rowId || row.id || ''

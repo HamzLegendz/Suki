@@ -1,10 +1,13 @@
 import type { ExtendedWASocket } from "../types/extendWASocket";
+import { commandCache } from "../libs/commandCache";
+
 
 export { };
 
 declare global {
   var opts: any;
   var prefix: any;
+  var commandCache: CommandCache;
   var db: Low<any>;
   var loadDatabase: () => Promse<void>;
   var conn: ExtendedWASocket;

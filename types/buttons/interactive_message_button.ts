@@ -11,13 +11,14 @@ export interface ButtonParams {
 }
 
 export interface ListRow {
-  title: string;
+  header?: string;
+  title?: string;
   description?: string;
-  rowId?: string;
   id?: string;
 }
 
 export interface ListSection {
+  highlight_label?: string;
   title?: string;
   rows: ListRow[];
 }

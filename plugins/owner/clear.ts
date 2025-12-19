@@ -10,7 +10,7 @@ let handler: PluginHandler = {
   exec: async (m, { conn }) => {
     conn!!.reply(m.chat, "Success!", m);
 
-    const tmp = [tmpdir(), join(__dirname, '../../tmp')]
+    const tmp = ["../../tmp", join(__dirname, '../../tmp')]
     const filename: any = []
     tmp.forEach((dirname: string) => readdirSync(dirname).forEach((file: string) => filename.push(join(dirname, file))))
     return filename.map((file: string) => {

@@ -1,5 +1,4 @@
 import type { PluginHandler } from "@yuki/types";
-import { commandCache } from "../../libs/commandCache";
 
 let handler: PluginHandler = {
   name: "Reload Command Cache",
