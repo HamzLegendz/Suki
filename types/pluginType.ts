@@ -44,6 +44,7 @@ export interface PluginHandler {
   level?: number;
   disabled?: boolean;
   customPrefix?: RegExp;
+  usage?: string[] | RegExp;
   exec: (
     m: ExtendedWAMessage,
     ctx: HandlerContext

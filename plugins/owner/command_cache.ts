@@ -1,18 +1,18 @@
 import type { PluginHandler } from "@yuki/types";
 
 let handler: PluginHandler = {
-  name: "Reload Command Cache",
-  description: "Rebuild command cache (admin only)",
   cmd: ["reloadcache", "cachereload"],
+  rowner: true,
   owner: true,
+  admin: true,
   exec: async (m, { conn }) => {
     const start = Date.now();
-    
+
     commandCache.build(global.plugins);
-    
+
     const stats = commandCache.getStats();
     const elapsed = Date.now() - start;
-    
+
     const message = `✅ *Command Cache Rebuilt*
 
 📊 *Statistics:*

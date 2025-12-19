@@ -1,3 +1,76 @@
+import type { proto } from "baileys";
+
+type ButtonV2Type = 'copy' | 'url' | 'buttons' | 'reminder' | 'webview';
+
+interface BaseButtonV2 {
+  type: ButtonV2Type;
+  text: string;
+}
+
+interface UrlButtonV2 extends BaseButtonV2 {
+  type: 'url';
+  url: string;
+}
+
+interface CopyButtonV2 extends BaseButtonV2 {
+  type: 'copy';
+  copy_code: string;
+}
+
+interface ButtonsButtonV2 extends BaseButtonV2 {
+  type: 'buttons';
+  id: string;
+}
+
+interface ReminderButtonV2 extends BaseButtonV2 {
+  type: 'reminder';
+  id: string;
+}
+
+interface WebviewButtonV2 extends BaseButtonV2 {
+  type: 'webview',
+  url: string;
+}
+
+export type ButtonV2Params =
+  | UrlButtonV2
+  | CopyButtonV2
+  | ButtonsButtonV2
+  | ReminderButtonV2
+  | WebviewButtonV2;
+
+export interface BtnOptsV2Params {
+  contextInfo?: Partial<proto.IContextInfo>;
+  body: Partial<proto.Message.InteractiveMessage.Body>;
+  header?: Partial<proto.Message.InteractiveMessage.Header>;
+  footer?: Partial<proto.Message.InteractiveMessage.Footer>;
+}
+
+export interface ListV2Rows {
+  header?: string;
+  title: string;
+  description?: string;
+  id: string;
+}
+
+export interface ListV2Sections {
+  title?: string,
+  highlight_label?: string;
+  rows: ListV2Rows[];
+}
+
+export interface ListV2 {
+  title: string;
+  sections: ListV2Sections[]
+}
+
+export interface BtnOptsV2ListParams {
+  contextInfo?: Partial<proto.IContextInfo>;
+  body: Partial<proto.Message.InteractiveMessage.Body>;
+  header?: Partial<proto.Message.InteractiveMessage.Header>;
+  footer?: Partial<proto.Message.InteractiveMessage.Footer>;
+}
+
 export interface ButtonParams {
   id?: string;
   text?: string;
@@ -11,14 +84,12 @@ export interface ButtonParams {
 }
 
 export interface ListRow {
-  header?: string;
   title?: string;
   description?: string;
   id?: string;
 }
 
 export interface ListSection {
-  highlight_label?: string;
   title?: string;
   rows: ListRow[];
 }

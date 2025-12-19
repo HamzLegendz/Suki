@@ -4,7 +4,7 @@ import os from "node:os";
 let handler: PluginHandler = {
   name: "Ping plugin",
   description: " Command to check whether the bot is responding or not",
-  tags: ["general"],
+  tags: ["public"],
   cmd: ["ping", "p"],
   exec: async (m, { conn, delay }) => {
     let start = performance.now();

@@ -2,10 +2,11 @@ import type {
   WASocket,
   MiscMessageGenerationOptions,
   MessageRelayOptions,
-  proto
+  proto,
+  MessageGenerationOptionsFromContent
 } from "baileys";
 import type { ILogger } from "baileys/lib/Utils/logger";
-import type { ButtonParams, InteractiveMessageContent, ListSection, SendButtonOptions, SendListOptions } from "./buttons/interactive_message_button";
+import type { BtnOptsV2ListParams, BtnOptsV2Params, ButtonParams, ButtonV2Params, InteractiveMessageContent, ListSection, SendButtonOptions, SendListOptions, ListV2 } from "./buttons/interactive_message_button";
 import type { ExtendedWAMessage } from "./extendWAMessage";
 
 export interface Logger extends ILogger {
@@ -47,6 +48,20 @@ export interface ExtendedWASocket extends WASocket {
     maxTries?: number,
     timeoutMs?: number
   ): Promise<any>;
+
+  sendListV2(
+    jid: string,
+    btnOpts: BtnOptsV2ListParams,
+    buttons: ListV2,
+    quoted: MessageGenerationOptionsFromContent,
+  ): Promise<ExtendedWAMessage>;
+
+  sendButtonV2(
+    jid: string,
+    btnOpts: BtnOptsV2Params,
+    buttons: ButtonV2Params[],
+    quoted: MessageGenerationOptionsFromContent
+  ): Promise<ExtendedWAMessage>;
 
   sendInteractiveMessage(
     jid: string,

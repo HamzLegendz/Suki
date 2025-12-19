@@ -709,6 +709,112 @@ END:VCARD`.trim();
         return conn.sendInteractiveMessage(jid, payload, sendOptions);
       }
     },
+    sendButtonV2: {
+      async value(jid: string, btnOpts: any, buttons: any[], quoted: any) {
+        try {
+          let interactiveBtn = buttons.map((button: any) => {
+            if (button.type === "url") {
+              return {
+                name: "cta_url",
+                buttonParamsJson: JSON.stringify({
+                  display_text: button.text,
+                  url: button.url,
+                  merchant_url: button.url
+                })
+              }
+            } else if (button.type === 'copy') {
+              return {
+                name: "cta_copy",
+                buttonParamsJson: JSON.stringify({
+                  display_text: button.text,
+                  id: button.id,
+                  copy_code: button.copy_code
+                })
+              }
+            } else if (button.type === 'buttons') {
+              return {
+                name: "quick_reply",
+                buttonParamsJson: JSON.stringify({
+                  display_text: button.text,
+                  id: button.id
+                })
+              };
+            } else if (button.type === "reminder") {
+              return {
+                name: "cta_reminder",
+                buttonParamsJson: JSON.stringify({
+                  display_text: button.text,
+                  id: button.id
+                })
+              }
+            } else if (button.type === "webview") {
+              return {
+                name: "open_webview",
+                buttonParamsJson: JSON.stringify({
+                  link: {
+                    in_app_webview: true,
+                    display_text: button.text,
+                    url: button.url,
+                    success_url: button.url + "/success",
+                    cancel_url: button.url + "/cancel"
+                  }
+                })
+              }
+            }
+          });
+
+          let msg = generateWAMessageFromContent(jid, {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            interactiveMessage: proto.Message.InteractiveMessage.create({
+              ...(btnOpts.contextInfo && {
+                contextInfo: btnOpts.contextInfo
+              }),
+              ...(btnOpts.header && {
+                header: proto.Message.InteractiveMessage.Header.create(btnOpts.header)
+              }),
+              ...(btnOpts.body && {
+                body: proto.Message.InteractiveMessage.Body.create(btnOpts.body)
+              }),
+              ...(btnOpts.footer && {
+                footer: proto.Message.InteractiveMessage.Footer.create(btnOpts.footer)
+              }),
+              nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                buttons: interactiveBtn as any
+              })
+            })
+          }, quoted)
+
+          await conn!!.relayMessage(jid, msg.message, {
+            messageId: msg.key.id,
+            additionalNodes: [
+              {
+                tag: "biz",
+                attrs: {},
+                content: [{
+                  tag: "interactive",
+                  attrs: {
+                    type: "native_flow",
+                    v: "1"
+                  },
+                  content: [{
+                    tag: "native_flow",
+                    attrs: {
+                      v: "9",
+                      name: "mixed"
+                    }
+                  }]
+                }]
+              }
+            ]
+          })
+        } catch (e) {
+          console.error(`Error sending button message: ${e}`)
+        }
+      }
+    },
     sendButtonWithImage: {
       async value(
         jid: string,
@@ -739,7 +845,69 @@ END:VCARD`.trim();
         });
       }
     },
+    sendListV2: {
+      async value(
+        jid: string,
+        btnOpts: any,
+        buttons: any,
+        quoted: any
+      ) {
+        try {
+          let msg = generateWAMessageFromContent(jid, {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            interactiveMessage: proto.Message.InteractiveMessage.create({
+              ...(btnOpts.contextInfo && {
+                contextInfo: btnOpts.contextInfo
+              }),
+              ...(btnOpts.header && {
+                header: proto.Message.InteractiveMessage.Header.create(btnOpts.header)
+              }),
+              ...(btnOpts.body && {
+                body: proto.Message.InteractiveMessage.Body.create(btnOpts.body)
+              }),
+              ...(btnOpts.footer && {
+                footer: proto.Message.InteractiveMessage.Footer.create(btnOpts.footer)
+              }),
+              nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                buttons: [{
+                  name: "single_select",
+                  buttonParamsJson: JSON.stringify(buttons)
+                }]
+              })
+            })
+          }, quoted)
 
+          await conn!!.relayMessage(jid, msg.message, {
+            messageId: msg.key.id,
+            additionalNodes: [
+              {
+                tag: "biz",
+                attrs: {},
+                content: [{
+                  tag: "interactive",
+                  attrs: {
+                    type: "native_flow",
+                    v: "1"
+                  },
+                  content: [{
+                    tag: "native_flow",
+                    attrs: {
+                      v: "9",
+                      name: "mixed"
+                    }
+                  }]
+                }]
+              }
+            ]
+          })
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    },
     sendList: {
       async value(
         jid: string,
@@ -759,9 +927,7 @@ END:VCARD`.trim();
           listType: proto.Message.ListMessage.ListType.SINGLE_SELECT,
           sections: sections.map(section => ({
             title: section.title || 'Section',
-            ...(section.highlight_label ? { highlight_label: section.highlight_label } : {}),
             rows: section.rows.map((row: any) => ({
-              ...(section.header ? { header: section.header } : {}),
               title: row.title || '',
               description: row.description || '',
               rowId: row.rowId || row.id || ''

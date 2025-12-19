@@ -1,7 +1,6 @@
 import type { PluginHandler } from "@yuki/types"
 
 const handler: PluginHandler = {
-  name: "Execute a shell command",
   cmd: /.*/,
   customPrefix: /^[$]/,
   owner: true,

@@ -4,6 +4,7 @@ import axios from "axios";
 let handler: PluginHandler = {
   name: "Download TikTok videos",
   description: "Download TikTok videos easily",
+  usage: [".tiktok <link>"],
   tags: ["downloader"],
   cmd: /^(tiktok|tt|tiktokdl|tiktoknowm)$/i,
   limit: true,

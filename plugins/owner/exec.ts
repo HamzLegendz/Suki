@@ -2,10 +2,9 @@ import type { PluginHandler } from "@yuki/types";
 import { format } from "node:util";
 
 let handler: PluginHandler = {
-  name: "Direct command execution",
   cmd: /(?:)/i,
   customPrefix: /^=?>/,
-  owner: true,
+  rowner: true,
   exec: async (m, { conn, usedPrefix, noPrefix, args, groupMetadata }) => {
     let _return: any;
     let _syntax: any;

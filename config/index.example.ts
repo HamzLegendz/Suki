@@ -18,3 +18,7 @@ global.APIs = {
 global.APIKeys = {
   // 'https://website': 'apikey'
 }
+
+global.thumb = "https://files.catbox.moe/7n4axc.png"
+/// Change you own document thumb
+global.docthumb = "https://files.catbox.moe/gfwn8c.png"
