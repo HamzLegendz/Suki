@@ -8,7 +8,6 @@ import { fileURLToPath } from 'url';
 import yargs from "yargs";
 import { makeWASocket, serialize, protoType } from './libs/serialize';
 import chalk from "chalk";
-import { tmpdir } from "os";
 import ts from "typescript";
 import chokidar from "chokidar";
 import cp from "node:child_process";
@@ -29,7 +28,7 @@ serialize();
 protoType();
 
 global.commandCache = commandCache;
-global.API = (name, path = '/', query = {}, apikeyqueryname) => (name in global.APIs ? global.APIs[name] : name) + path + (query || apikeyqueryname ? '?' + new URLSearchParams(Object.entries({ ...query, ...(apikeyqueryname ? { [apikeyqueryname]: global.APIKeys[name in global.APIs ? global.APIs[name] : name] } : {}) })) : '')
+global.API = (name: any, path = '/', query = {}, apikeyqueryname: any) => (name in global.APIs ? global.APIs[name] : name) + path + (query || apikeyqueryname ? '?' + new URLSearchParams(Object.entries({ ...query, ...(apikeyqueryname ? { [apikeyqueryname]: global.APIKeys[name in global.APIs ? global.APIs[name] : name] } : {}) })) : '')
 
 global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse());
 global.prefix = new RegExp('^[' + (opts['prefix'] || '‎xzXZ/i!#$%+£¢€¥^°=¶∆×÷π√✓©®:;?&.\\-').replace(/[|\\{}()[\]^$+*?.\-\^]/g, '\\$&') + ']')
@@ -84,14 +83,29 @@ if (!conn.authState.creds.registered) {
   }, 3000)
 }
 
-if (global.db) {
-  setInterval(async () => {
+if (!opts["test"]) {
+  if (global.db) setInterval(async () => {
     if (global.db.data) await global.db.write().catch(console.error);
-    if ((global.support || {}).find) {
-      const tmp = [tmpdir(), 'tmp'];
-      tmp.forEach(filename => Bun.$`find ${filename} -amin 3 -type f -delete`);
+  }, 2000)
+}
+
+if (!opts["test"] && opts["autocleartmp"]) {
+  setInterval(async () => {
+    try {
+      const tmpPath = path.join(process.cwd(), "tmp")
+      const files = fs.readdirSync(tmpPath)
+
+      if (files.length === 0) return;
+
+      await Promise.all(
+        files.map((file: string) => {
+          return fs.promises.rm(path.join(tmpPath, file), { recursive: true, force: true })
+        })
+      )
+    } catch (e: any) {
+      conn.logger.error(`Cannot delete trash in tmp folder : ${e}`)
     }
-  }, 2000);
+  }, 5 * 60 * 1000) // 5 Minutes
 }
 
 async function connectionUpdate(update: any) {
