@@ -9,10 +9,11 @@ import yargs from "yargs";
 import { makeWASocket, serialize, protoType } from './libs/serialize';
 import chalk from "chalk";
 import ts from "typescript";
-import chokidar from "chokidar";
+import chokidar, { FSWatcher, type ChokidarOptions } from "chokidar";
 import cp from "node:child_process";
 import crypto from 'node:crypto';
 import { commandCache } from "./libs/commandCache";
+import { yukiKeepMatcher, yukiKeepParser } from "libs/yukiKeepParser";
 
 function filename(metaUrl = import.meta.url) {
   return fileURLToPath(metaUrl)
@@ -90,22 +91,136 @@ if (!opts["test"]) {
 }
 
 if (!opts["test"]) {
-  setInterval(async () => {
-    try {
-      const tmpPath = path.join(process.cwd(), "tmp")
-      const files = fs.readdirSync(tmpPath)
+  const tmpPath = path.join(process.cwd(), "tmp");
+  const yukiKeepPath = path.join(tmpPath, ".yuki_keep");
 
-      if (files.length === 0) return;
-
-      await Promise.all(
-        files.map((file: string) => {
-          return fs.promises.rm(path.join(tmpPath, file), { recursive: true, force: true })
-        })
-      )
-    } catch (e: any) {
-      conn.logger.error(`Cannot delete trash in tmp folder : ${e}`)
+  let cleanupInterval: NodeJS.Timeout | null = null;
+  let configWatcher: FSWatcher | null = null;
+  const cleanupMemory = () => {
+    yukiKeepParser.clearCache();
+    yukiKeepMatcher.clearCache();
+  };
+  const startCleanup = () => {
+    if (cleanupInterval) {
+      clearInterval(cleanupInterval);
+      cleanupInterval = null;
     }
-  }, 5 * 60 * 1000) // 5 Minutes
+
+    const config = yukiKeepParser.parse(yukiKeepPath);
+
+    if (!config.enabled) return;
+
+    cleanupInterval = setInterval(async () => {
+      try {
+        const currentConfig = yukiKeepParser.parse(yukiKeepPath);
+
+        if (!currentConfig.enabled) return;
+
+        if (!fs.existsSync(tmpPath)) return;
+
+        const files = fs.readdirSync(tmpPath);
+        if (files.length === 0) return;
+
+        let deletedCount = 0;
+        let keptCount = 0;
+        let deletedSize = 0;
+
+        const results = await Promise.allSettled(
+          files.map(async (file: string) => {
+            if (file === '.yuki_keep') {
+              keptCount++;
+              return;
+            }
+
+            const filePath = path.join(tmpPath, file);
+
+            try {
+              if (yukiKeepMatcher.shouldKeep(file, filePath, currentConfig.keepRules)) {
+                keptCount++;
+                return;
+              }
+
+              if (yukiKeepMatcher.shouldDelete(file, filePath, currentConfig.deleteRules)) {
+                const stats = fs.statSync(filePath);
+                const fileSize = stats.size;
+
+                await fs.promises.rm(filePath, { recursive: true, force: true });
+                deletedCount++;
+                deletedSize += fileSize;
+              } else {
+                keptCount++;
+              }
+            } catch (err) {
+              conn.logger.error(`Failed to process ${file}: ${err}`);
+            }
+          })
+        );
+
+        const formatSize = (bytes: number): string => {
+          if (bytes < 1024) return `${bytes}B`;
+          if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)}KB`;
+          if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)}MB`;
+          return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)}GB`;
+        };
+
+        if (deletedCount > 0 || keptCount > 0) {
+          conn.logger.info(
+            `Yuki Keep: ${deletedCount} deleted (${formatSize(deletedSize)}), ${keptCount} kept`
+          );
+        }
+
+        if (Math.random() < 0.1) {
+          cleanupMemory();
+        }
+      } catch (e: any) {
+        console.error(e)
+      }
+    }, config.interval * 60 * 1000);
+  };
+
+  if (fs.existsSync(tmpPath)) {
+    configWatcher = chokidar.watch(yukiKeepPath, {
+      persistent: true,
+      ignoreInitial: true,
+      usePolling: false,
+      awaitWriteFinish: {
+        stabilityThreshold: 300,
+        pollInterval: 100
+      }
+    });
+
+    configWatcher.on('change', () => {
+      yukiKeepParser.clearCache();
+      startCleanup();
+    });
+
+    configWatcher.on('add', () => {
+      startCleanup();
+    });
+
+    configWatcher.on('unlink', () => {
+      if (cleanupInterval) {
+        clearInterval(cleanupInterval);
+        cleanupInterval = null;
+      }
+      startCleanup();
+    });
+  }
+
+  startCleanup();
+
+  process.on('exit', () => {
+    if (cleanupInterval) clearInterval(cleanupInterval);
+    if (configWatcher) configWatcher.close();
+    cleanupMemory();
+  });
+
+  process.on('SIGINT', () => {
+    if (cleanupInterval) clearInterval(cleanupInterval);
+    if (configWatcher) configWatcher.close();
+    cleanupMemory();
+    process.exit(0);
+  });
 }
 
 async function connectionUpdate(update: any) {

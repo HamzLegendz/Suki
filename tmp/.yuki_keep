@@ -1,0 +1,9 @@
+# Do not DELETE or EDIT unless you know what you are doing.
+
+enabled: true
+interval: 5
+
+keep: important-*, session-*, *.log, *.db
+
+delete: tmp-*
+delete_older_than: 30m
