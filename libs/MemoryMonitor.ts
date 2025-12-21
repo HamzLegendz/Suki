@@ -297,7 +297,7 @@ export class MemoryMonitor {
   }
 
   forceGC(): void {
-    if (!Bun.gc) {
+    if (!global.gc) {
       this.logger.warn('GC not exposed. Run with --expose-gc flag to enable.');
       return;
     }
@@ -307,7 +307,7 @@ export class MemoryMonitor {
 
     this.logger.info(`🗑️ Forcing GC (heap: ${this.formatMB(before)})...`);
 
-    Bun.gc(true);
+    global.gc(true);
 
     const after = process.memoryUsage().heapUsed;
     const afterMB = after / 1024 / 1024;

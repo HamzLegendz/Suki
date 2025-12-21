@@ -13,7 +13,7 @@ export function initializeUser(user: any, sender: string, m: any): void {
   if (user) {
     if (!isNumber(user.exp)) user.exp = 0;
     if (!isNumber(user.limit)) user.limit = 100;
-    if (!isNumber(user.level)) user.level = 0;
+    if (!isNumber(user.level)) user.level = 1;
     if (!('registered' in user)) user.registered = false;
     if (!user.registered) {
       if (!('name' in user)) user.name = m.name;
@@ -36,7 +36,7 @@ export function initializeUser(user: any, sender: string, m: any): void {
   } else global.db.data.users[sender] = {
     exp: 0,
     limit: 50,
-    level: 0,
+    level: 1,
     registered: false,
     name: m.name,
     age: -1,

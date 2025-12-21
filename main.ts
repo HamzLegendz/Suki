@@ -269,10 +269,63 @@ async function connectionUpdate(update: any) {
 
   if (connection == 'close') {
     conn.logger.error('Connection lost...');
-  }
 
-  if (lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut) {
-    console.log(await global.reloadHandler(true));
+    if (lastDisconnect?.error) {
+      const statusCode = lastDisconnect.error.output?.statusCode;
+      const errorMessage = lastDisconnect.error.output?.payload?.message || lastDisconnect.error.message;
+      
+      conn.logger.error(`Disconnect reason: ${errorMessage} (${statusCode})`);
+      
+      if (statusCode === DisconnectReason.loggedOut) {
+        conn.logger.error('Logged out permanently. Please do pairing code again.');
+        await cleanupManager.cleanup();
+        process.exit(0);
+      }
+
+      if (statusCode === DisconnectReason.badSession) {
+        conn.logger.error('Bad session. Clearing auth state...');
+        try {
+          await fs.promises.rm('./Yuki', { recursive: true, force: true });
+        } catch (e) {
+          conn.logger.error('Failed to clear session:', e);
+        }
+        process.exit(0);
+      }
+      
+      if (
+        statusCode === DisconnectReason.connectionClosed ||
+        statusCode === DisconnectReason.connectionLost ||
+        statusCode === DisconnectReason.connectionReplaced ||
+        statusCode === DisconnectReason.timedOut
+      ) {
+        conn.logger.warn('Connection issue detected. Attempting reconnect...');
+        setTimeout(async () => {
+          try {
+            await global.reloadHandler(true);
+          } catch (e) {
+            conn.logger.error('Reconnect failed:', e);
+            process.exit(1);
+          }
+        }, 5000);
+        return;
+      }
+ 
+      if (statusCode === DisconnectReason.restartRequired) {
+        conn.logger.warn('Restart required by WhatsApp...');
+        await cleanupManager.cleanup();
+        process.exit(0);
+      }
+  
+      conn.logger.error(`Unknown disconnect reason: ${statusCode}`);
+      setTimeout(async () => {
+        try {
+          await global.reloadHandler(true);
+        } catch (e) {
+          conn.logger.error('Reconnect failed:', e);
+          process.exit(1);
+        }
+      }, 5000);
+    }
   }
 
   if (global.db.data == null) {
