@@ -289,7 +289,6 @@ async function connectionUpdate(update: any) {
         } catch (e) {
           conn.logger.error('Failed to clear session:', e);
         }
-        process.exit(0);
       }
       
       if (
@@ -304,7 +303,7 @@ async function connectionUpdate(update: any) {
             await global.reloadHandler(true);
           } catch (e) {
             conn.logger.error('Reconnect failed:', e);
-            process.exit(1);
+            process.exit(0);
           }
         }, 5000);
         return;
@@ -313,7 +312,6 @@ async function connectionUpdate(update: any) {
       if (statusCode === DisconnectReason.restartRequired) {
         conn.logger.warn('Restart required by WhatsApp...');
         await cleanupManager.cleanup();
-        process.exit(0);
       }
   
       conn.logger.error(`Unknown disconnect reason: ${statusCode}`);
@@ -322,7 +320,7 @@ async function connectionUpdate(update: any) {
           await global.reloadHandler(true);
         } catch (e) {
           conn.logger.error('Reconnect failed:', e);
-          process.exit(1);
+          process.exit(0);
         }
       }, 5000);
     }

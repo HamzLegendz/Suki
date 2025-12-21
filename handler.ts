@@ -28,7 +28,10 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
     } catch (e) {
       console.error(e)
     }
-
+    if (opts["self"]) {
+        m.exp = 0;
+        m.limit = false;
+    }
     if (opts["nyimak"]) return;
     if (opts["self"] && !m.fromMe && !global.db.data.users[m.sender].moderator) return
     if (opts["autoread"]) await this.readMessages([m.key]);
@@ -44,6 +47,7 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
     const isBans = global.db.data.users[m.sender].banned;
 
     if (isROwner) {
+      global.db.data.users[m.sender].registered = true;
       global.db.data.users[m.sender].premium = true;
       global.db.data.users[m.sender].premiumDate = "infinity";
       global.db.data.users[m.sender].limit = "infinity";
@@ -222,10 +226,15 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
       m.isCommand = true
       // This is xp user, Where only run command 
       // Users gain EXP based on their level.
-      const { calculateDynamicXP } = await import('./libs/xp-system.ts');
-      const baseXP = 'exp' in plugin ? parseInt(plugin.exp) : 50;
-      const currentLevel = global.db.data.users[m.sender]?.level;
-      m.exp = calculateDynamicXP(baseXP, currentLevel);
+      if (!opts["self"]) {
+        const { calculateDynamicXP } = await import('./libs/xp-system.ts');
+        const baseXP = 'exp' in plugin ? parseInt(plugin.exp) : 50;
+        const currentLevel = global.db.data.users[m.sender]?.level;
+        m.exp = calculateDynamicXP(baseXP, currentLevel);
+      } else {
+        m.exp = 0;
+      }
+      
       if (!isPrems && plugin.limit && global.db.data.users[m.sender].limit < plugin.limit * 1) {
         this.reply(m.chat, "Your bot usage limit has expired and will be reset at 00.00 WIB (Indonesian Time)\nTo get more limit upgrade to premium send *.premium*", m);
       }
@@ -297,8 +306,10 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
     let user: any, stats = global.db.data.stats
     if (m) {
       if (m.sender && (user = global.db.data.users[m.sender])) {
-        user.exp += m.exp
-        user.limit -= m.limit * 1
+        if (!opts["self"]) {
+            user.exp += m.exp
+            user.limit -= m.limit * 1
+        }
       }
 
       let stat: any
