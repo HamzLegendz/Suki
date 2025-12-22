@@ -5,7 +5,7 @@ let handler: PluginHandler = {
   cmd: /(?:)/i,
   customPrefix: /^=?>/,
   rowner: true,
-  exec: async (m, { conn, usedPrefix, noPrefix, args, groupMetadata }) => {
+  exec: async (m, { conn, usedPrefix, noPrefix, args, groupMetadata, isAdmin, isRAdmin }) => {
     let _return: any;
     let _syntax: any;
     let _text = (/^=/.test(usedPrefix!) ? 'return ' : '') + noPrefix;
@@ -29,6 +29,8 @@ let handler: PluginHandler = {
         'process',
         'args',
         'groupMetadata',
+        'isAdmin',
+        'isRAdmin',
         'module',
         'exports',
         'argument',

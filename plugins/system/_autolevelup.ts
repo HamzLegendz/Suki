@@ -4,7 +4,8 @@ import canvafy from "canvafy";
 export async function before(m, { conn }) {
   const user = global.db.data.users[m.sender];
   
-  if (!user.autolevelup) return !0;
+  if (opts["self"]) return !0;
+  if (!user.autolevelup) return !0;  
   
   let ppUrl: string;
   try {

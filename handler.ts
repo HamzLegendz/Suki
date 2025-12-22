@@ -74,12 +74,12 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
     let _user = global.db.data && global.db.data.users && global.db.data.users[m.sender]
     const groupMetadata = (m.isGroup ? (conn.chats[m.chat] || {}).metadata : {}) || {}
     const participants = (m.isGroup ? groupMetadata.participants : []) || []
-    const user = (m.isGroup ? participants.find((u: any) => conn.decodeJid(u.id) === m.sender) : {}) || {}
-    const bot = (m.isGroup ? participants.find((u: any) => conn.decodeJid(u.id) == this.user.jid) : {}) || {};
+    const user = (m.isGroup ? participants.find((u: any) => u.phoneNumber === m.sender) : {}) || {}
+    const bot = (m.isGroup ? participants.find((u: any) => u.phoneNumber == this.user.jid) : {}) || {};
     const isRAdmin = user && user.admin == 'superadmin' || false
     // is the user admin?
     const isAdmin = isRAdmin || user && user.admin == 'admin' || false
-    // Is the bot Admib?
+    // Is the bot Admin?
     const isBotAdmin = bot && bot.admin || false
     for (let name in global.plugins) {
       let plugin = global.plugins[name];
