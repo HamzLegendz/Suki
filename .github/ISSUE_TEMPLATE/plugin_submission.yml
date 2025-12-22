@@ -1,0 +1,93 @@
+name: Plugin Submission
+description: Submit a new plugin for review
+title: "[PLUGIN] "
+labels: ["plugin", "community"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for contributing a plugin! Please provide the details below.
+
+  - type: input
+    id: plugin-name
+    attributes:
+      label: Plugin Name
+      description: What is the name of your plugin?
+      placeholder: "My Awesome Plugin"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe what your plugin does
+      placeholder: This plugin does...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Which category does this plugin belong to?
+      options:
+        - General
+        - Fun
+        - Utility
+        - Media
+        - Admin
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: Plugin Code
+      description: Paste your plugin code here
+      render: typescript
+      placeholder: |
+        import type { PluginHandler } from "@yuki/types";
+        
+        const handler: PluginHandler = {
+          // Your plugin code
+        }
+        
+        export default handler;
+    validations:
+      required: true
+
+  - type: textarea
+    id: usage
+    attributes:
+      label: Usage Examples
+      description: How do users use this plugin?
+      placeholder: |
+        !command <args>
+        Example: !weather Jakarta
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: List any external dependencies required
+      placeholder: |
+        - axios
+        - cheerio
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: My plugin follows the coding guidelines
+          required: true
+        - label: I have tested this plugin thoroughly
+          required: true
+        - label: This plugin doesn't contain malicious code
+          required: true
+        - label: I agree to license this under MIT
+          required: true
