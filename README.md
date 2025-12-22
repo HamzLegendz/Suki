@@ -20,14 +20,14 @@ Yuki is a modern, high-performance WhatsApp bot built exclusively for [Bun](http
 
 ## ✨ Features
 
-- ✅ **Pairing Code Support** - Easy setup without QR scanning
-- ✅ **Advanced Serializer System** - Fully typed message serialization
-- ✅ **Plugin-Based Architecture** - Modular command system
-- ✅ **Interactive Messages** - Support for buttons, lists, and reactions
-- ✅ **Memory Efficient** - Stable memory usage for long-running processes
-- ✅ **Type-Safe** - Built with TypeScript for better DX
-- ✅ **Auto-Reload** - Hot reload plugins without restarting
-- ✅ **Production Ready** - Optimized for 24/7 uptime
+- [x] **Pairing Code Support** - Easy setup without QR scanning
+- [x] **Advanced Serializer System** - Fully typed message serialization
+- [x] **Plugin-Based Architecture** - Modular command system
+- [x] **Interactive Messages** - Support for buttons, lists, and reactions
+- [x] **Memory Efficient** - Stable memory usage for long-running processes
+- [x] **Type-Safe** - Built with TypeScript for better DX
+- [x] **Auto-Reload** - Hot reload plugins without restarting
+- [x] **Production Ready** - Optimized for 24/7 uptime
 
 > [!NOTE]
 > Some parts of the codebase use relaxed TypeScript rules for development efficiency. 
@@ -44,12 +44,13 @@ Before installing Yuki, ensure you have:
 - **Bun** >= 1.0.0 ([Download here](https://bun.sh))
 - **Git** for cloning the repository
 - **WhatsApp Account** (active phone number)
+- **FFmpeg** >= 7.1.1 Optional, But for handle or convert media ([Download here](https://www.ffmpeg.org/download.html))
 - **Basic JavaScript/TypeScript knowledge** (recommended)
 
 ### Supported Platforms
-- ✅ Linux (Recommended)
-- ✅ macOS
-- ✅ Windows (WSL2 recommended)
+- [x] Linux (Recommended)
+- [x] macOS
+- [x] Windows (WSL2 recommended)
 
 ## 🚀 Installation
 
@@ -223,10 +224,10 @@ Contributions are welcome! Here's how you can help:
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
 ### What this means:
-- ✅ Commercial use
-- ✅ Modification
-- ✅ Distribution
-- ✅ Private use
+- [x] Commercial use
+- [x] Modification
+- [x] Distribution
+- [x] Private use
 
 **Attribution appreciated but not required!** ⭐
 
