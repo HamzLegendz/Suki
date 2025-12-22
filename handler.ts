@@ -3,9 +3,9 @@ import { smsg } from "./libs/serialize";
 import type { ExtendedWAMessage } from "./types/extendWAMessage";
 import util from "node:util";
 import fs from "node:fs";
-import { uploader } from "./libs/uploadImage";
 import { initializeDatabase } from "./libs/database-initializer";
 import { assignStaffRole, StaffRole, updateUserRole } from "libs/role-system.ts";
+import type { ExtendedWASocket } from "libs/store.ts";
 
 const isNumber = (x: number) => typeof x === 'number' && !isNaN(x)
 const delay = (ms: number) => isNumber(ms) && new Promise(resolve => setTimeout(resolve, ms))
@@ -350,58 +350,116 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
   }
 }
 
-// I wonder why this is still a bug?
 export async function participantsUpdate({ id, participants, action }: BaileysEventMap["group-participants.update"], simulate: boolean = false) {
   if (opts["self"]) return;
-  if (this.isInit && !simulate) return
-  if (global.db.data == null)
-    await loadDatabase()
-  let chat = global.db.data.chats[id] || {}
-  let text = ''
+  if (this.isInit && !simulate) return;
+  if (global.db.data == null) await loadDatabase();
+
+  let chat = global.db.data.chats[id] || {};
+  let text = '';
+
   switch (action) {
     case 'add':
-    case 'remove':
+    case 'remove': {
       if (chat.welcome) {
-        let groupMetadata = (conn.chats[id] || {}).metadata || await this.groupMetadata(id);
+        let groupMetadata = await (this as ExtendedWASocket).groupMetadata(id) || (conn.chats[id] || {}).metadata;
+
         for (let user of participants) {
-          if (action === "add") await delay(1000);
-          let userJid = this.getJid(String(user).decodeJid()) || String(user).decodeJid();
-          let pp: any;
-          try {
-            const pps = await this.profilePictureUrl(userJid, 'image').catch(() => 'https://files.catbox.moe/m84nrf.jpg')
-            const ppB = Buffer.from(await (await fetch(pps)).arrayBuffer())
-            if (ppB?.length) pp = await uploader(ppB).catch(() => pps)
-          } catch { } finally {
-            text = (action === 'add' ? (chat.sWelcome || this.welcome || conn.welcome || 'Welcome, @user!').replace('@subject', await this.getName(id)).replace('@desc', groupMetadata.desc ? String.fromCharCode(8206).repeat(4001) + groupMetadata.desc : '') :
-              (chat.sBye || this.bye || conn.bye || 'Bye, @user!')).replace(/@user/g, '@' + user.id.split(`@`)[0])
-            this.sendMessage(id, {
-              text: text,
-              contextInfo: {
-                mentionedJid: [user],
-                externalAdReply: {
-                  showAdAttribution: true,
-                  title: 'DitzDev',
-                  thumbnailUrl: pp,
-                  mediaType: 1,
-                  renderLargerThumbnail: true
-                }
-              }
-            }, { quoted: null })
+          let pp = 'https://telegra.ph/file/24fa902ead26340f3df2c.png';
+          let gcname = groupMetadata.subject;
+
+          let userJid: string;
+          if (typeof user === 'string') {
+            userJid = user;
+          } else if (user && typeof user === 'object') {
+            userJid = user.phoneNumber || user.id;
+          } else {
+            console.error('Cannot extract JID from user:', user);
+            continue;
           }
+
+          try {
+            pp = await (this as ExtendedWASocket).profilePictureUrl(userJid, 'image') as string;
+          } catch { }
+
+          const defaultWelcome = `┏━━━❰ *WELCOME* ❱━━━┓
+┃
+┃ Hey @user! 👋
+┃
+┃ Welcome to
+┃ *@subject*
+┃
+┃ Please read the group
+┃ description and rules! 📋
+┃
+┗━━━━━━━━━━━━━━━┛`;
+
+          const defaultBye = `┏━━━❰ *GOODBYE* ❱━━━┓
+┃
+┃ @user has left 👋
+┃
+┃ We'll miss you in *@subject*
+┃
+┃ Take care! 🌟
+┃
+┗━━━━━━━━━━━━━━━┛`;
+
+          text = (action === "add"
+            ? (chat.sWelcome || defaultWelcome)
+            : (chat.sBye || defaultBye)
+          )
+            .replace('@subject', gcname)
+            .replace('@user', '@' + userJid.split('@')[0]);
+
+          (this as ExtendedWASocket).sendMessage(id, {
+            text: text,
+            contextInfo: {
+              mentionedJid: [userJid],
+              externalAdReply: {
+                // If your bot is a WA Business, maybe you can use this property
+                // related isues: https://github.com/wppconnect-team/wa-js/issues/1714
+                // showAdAttribution: true,
+                title: "YukiBotz",
+                thumbnailUrl: pp,
+                sourceUrl: global.sourceUrl,
+                mediaType: 1,
+                renderLargerThumbnail: true
+              }
+            }
+          }, { quoted: null } as any);
         }
       }
-      break
-    // ignore fallthrough
-    // @ts-ignore
+      break;
+    }
+
     case 'promote':
-      text = (chat.sPromote || this.spromote || conn.spromote || '@user ```is now Admin```')
-    case 'demote':
-      if (!text)
-        text = (chat.sDemote || this.sdemote || conn.sdemote || '@user ```is no longer Admin```')
-      text = text.replace('@user', '@' + (participants[0] as any).split('@')[0])
-      if (chat.detect)
-        this.sendMessage(id, { text, mentions: this.parseMention(text) })
-      break
+    case 'demote': {
+      let user = participants[0];
+      let userJid: string;
+
+      if (typeof user === 'string') {
+        userJid = user;
+      } else if (user && typeof user === 'object') {
+        userJid = user.phoneNumber || user.id;
+      } else {
+        console.error('Cannot extract JID from user:', user);
+        return;
+      }
+
+      text = action === 'promote'
+        ? '@user now is admin'
+        : '@user no longer an admin';
+
+      text = text.replace('@user', '@' + userJid.split('@')[0]);
+
+      if (chat.detect) {
+        await this.sendMessage(id, {
+          text,
+          mentions: this.parseMention(text)
+        });
+      }
+      break;
+    }
   }
 }
 
