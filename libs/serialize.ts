@@ -219,6 +219,17 @@ export function makeWASocket(
         return jid.decodeJid()
       },
     },
+    getJidFromLid: {
+      async value(lid: string) {
+        if (lid.endsWith("@s.whatsapp.net")) {
+          return lid; // if it's already @s.whatsapp.net
+        }
+
+        let lidSender = await (sock as ExtendedWASocket).signalRepository.lidMapping.getPNForLID(lid);
+        let jid = lidSender!.replace(/:\d+/, "")
+        return jid;
+      }
+    },
     getJid: {
       value(sender: any) {
         if (!conn.isLid) conn.isLid = {};
@@ -2036,6 +2047,9 @@ export function serialize() {
         if (this.key?.fromMe) return (this.conn?.user?.jid || "").decodeJid();
         const raw =
           this.key?.participantAlt || this.key?.remoteJidAlt || this.key?.participant || this.chat;
+        if (raw.endsWith("@lid")) {
+          return this.conn.getJidFromLid(raw)
+        }
         return this.conn.getJid((String(raw) as any).decodeJid());
       },
       enumerable: true,
@@ -2186,6 +2200,9 @@ export function serialize() {
                   this.chat ||
                   ""
                 ).decodeJid();
+                if (raw.endsWith("@lid")) {
+                  return conns.getJidFromLid(raw);
+                }
                 return conns.getJid(raw);
               },
               enumerable: true,

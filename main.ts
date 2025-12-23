@@ -148,7 +148,7 @@ async function connectionUpdate(update: any) {
       conn.logger.info('Connection closed gracefully');
       return;
     }
-  
+
     conn.logger.error('Connection lost...');
 
     if (lastDisconnect?.error) {
@@ -252,10 +252,10 @@ global.reloadHandler = async function(restatConn: boolean) {
   conn.ev.on('creds.update', conn.credsUpdate)
   conn.ev.on('group-participants.update', conn.participantsUpdate)
   conn.ev.on('groups.update', conn.groupsUpdate)
-  
+
   isInit = false;
   conn.logger.info("The handler is ready... ✓");
-  
+
   return true
 }
 
@@ -372,8 +372,8 @@ global.reload = async (filename: string = "") => {
   } finally {
     global.plugins = Object.fromEntries(
       Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b))
-    );    
-  }  
+    );
+  }
 }
 
 async function _quickTest() {
@@ -412,7 +412,7 @@ async function _quickTest() {
   if (!s.ffmpeg) conn.logger.warn('Please install ffmpeg for sending videos (pkg install ffmpeg)')
   if (s.ffmpeg && !s.ffmpegWebp) conn.logger.warn('Stickers may not animated without libwebp on ffmpeg (--enable-ibwebp while compiling ffmpeg)')
   if (!s.convert && !s.magick && !s.gm) conn.logger.warn('Stickers may not work without imagemagick if libwebp on ffmpeg doesnt isntalled (pkg install imagemagick)')
-  
+
   conn.logger.info('Quick Test Done... ✓');
 }
 
@@ -447,12 +447,12 @@ function setupTmpCleanup() {
 
   let cleanupInterval: NodeJS.Timeout | null = null;
   let configWatcher: FSWatcher | null = null;
-  
+
   const cleanupMemory = () => {
     yukiKeepParser.clearCache();
     yukiKeepMatcher.clearCache();
   };
-  
+
   const startCleanup = () => {
     if (cleanupInterval) {
       clearInterval(cleanupInterval);
@@ -571,28 +571,28 @@ function setupTmpCleanup() {
 async function initialize() {
   try {
     await global.loadDatabase();
-    
+
     await loadAllPlugins();
-    
+
     commandCache.build(global.plugins);
-        
+
     await _quickTest();
-    
+
     await global.reloadHandler();
-    
+
     memoryMonitor.start(60000);
-    
+
     if (!opts["test"]) {
       const dbSaveInterval = setInterval(async () => {
         if (global.db.data) await global.db.write().catch(console.error);
       }, 2000);
       cleanupManager.addInterval(dbSaveInterval);
     }
-    
+
     if (!opts["test"]) {
       setupTmpCleanup();
     }
-    
+
     const watcher = chokidar.watch(pluginFolder, {
       persistent: true,
       ignoreInitial: true,
@@ -610,9 +610,9 @@ async function initialize() {
       .on("change", global.reload)
       .on("add", global.reload)
       .on("unlink", global.reload);
-    
+
     conn.logger.info('Bot initialization complete... ✓');
-    
+
   } catch (error) {
     conn.logger.error('Failed to initialize:', error);
     process.exit(1);
@@ -621,28 +621,29 @@ async function initialize() {
 
 initialize();
 
-let isShuttingDown = false;  
+let isShuttingDown = false;
 
-async function gracefulShutdown(signal: string) {    
+async function gracefulShutdown(signal: string) {
   if (isShuttingDown) {
     conn.logger.warn(`Shutdown already in progress, ignoring ${signal}`);
     return;
   }
-  
+
   isShuttingDown = true;
-  
+
   conn.logger.info(`\n${signal} received. Starting graceful shutdown...`);
-  
+
   if (global.conn) {
     global.conn.isShuttingDown = true;
   }
-  
+
   try {
     if (global.conn?.ev) {
       conn.logger.info('Removing event listeners...');
+      // @ts-ignore
       global.conn.ev.removeAllListeners();
     }
-    
+
     if (global.conn?.ws) {
       conn.logger.info('Closing WhatsApp connection...');
       await new Promise<void>((resolve) => {
@@ -650,7 +651,7 @@ async function gracefulShutdown(signal: string) {
           conn.logger.warn('WebSocket close timeout, forcing...');
           resolve();
         }, 3000);
-        
+
         try {
           global.conn.ws.close();
           setTimeout(() => {
@@ -667,7 +668,7 @@ async function gracefulShutdown(signal: string) {
 
     conn.logger.info('Running cleanup handlers...');
     await cleanupManager.cleanup();
-    
+
     if (global.db?.data) {
       conn.logger.info('Final database save... ✓');
       await global.db.write().catch((e: any) => {
