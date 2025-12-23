@@ -1,8 +1,9 @@
 import type {
   WASocket,
   Contact,
-  GroupMetadata
+  GroupMetadata,
 } from 'baileys';
+import type { ExtendedWAMessage } from 'types/extendWAMessage';
 
 interface ChatData {
   id: string;
@@ -12,19 +13,50 @@ interface ChatData {
   isChats?: boolean;
   metadata?: GroupMetadata;
   presences?: string;
+  messages?: ExtendedWAMessage[];
   [key: string]: any;
 }
 
-interface ExtendedWASocket extends WASocket {
+interface ExtendedWASocketStore extends WASocket {
   chats: Record<string, ChatData>;
   decodeJid: (jid: string) => string;
   insertAllGroup?: () => void;
 }
 
+interface Store {
+  messages: Record<string, ExtendedWAMessage[]>;
+  chats: Record<string, ChatData>;
+}
+
 type ContactsUpdate = Contact[] | { contacts: Contact[] };
 
-function bind(conn: ExtendedWASocket): void {
+function bind(conn: ExtendedWASocketStore): Store {
   if (!conn.chats) conn.chats = {};
+
+  const store: Store = {
+    messages: {},
+    chats: conn.chats
+  };
+
+  function storeMessage(chatId: string, message: ExtendedWAMessage) {
+    if (!store.messages[chatId]) {
+      store.messages[chatId] = [];
+    }
+    
+    store.messages[chatId].push(message);
+
+    if (store.messages[chatId].length > 100) {
+      store.messages[chatId].shift();
+    }
+  }
+
+  conn.ev.on('messages.upsert', ({ messages }) => {
+    for (const msg of messages) {
+      if (msg.key.remoteJid) {
+        storeMessage(msg.key.remoteJid, msg as ExtendedWAMessage);
+      }
+    }
+  });
 
   /**
    * Update contact names to database
@@ -61,9 +93,7 @@ function bind(conn: ExtendedWASocket): void {
   conn.ev.on('groups.update', updateNameToDb as any);
 
   conn.ev.on('group-participants.update', async function updateParticipantsToDb({
-    id,
-    participants,
-    action
+    id
   }) {
     if (!id) return;
 
@@ -157,8 +187,10 @@ function bind(conn: ExtendedWASocket): void {
       console.error(e);
     }
   });
+
+  return store;
 }
 
 export default { bind };
 export { bind };
-export type { ExtendedWASocket, ChatData };
+export type { ExtendedWASocketStore, ChatData, Store };

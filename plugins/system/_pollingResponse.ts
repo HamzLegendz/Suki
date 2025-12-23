@@ -1,3 +1,4 @@
+// TODO: Fix Polling Response
 import {
   getAggregateVotesInPollMessage,
   generateWAMessage,
@@ -20,8 +21,9 @@ export async function before(messageUpdate, chatUpdate) {
   }
 
   const pollCreationKey = normalizedMessage.pollUpdateMessage!!.pollCreationMessageKey;
-  const storedMessage = (global.store as any).messages[messageUpdate.chat]?.array?.find((msg: any) => pollCreationKey?.id === msg.key.id);
-
+ 
+  const storedMessage = global.store.messages[messageUpdate.chat]?.find((msg: any) => pollCreationKey?.id === msg.key.id);
+  
   if (!storedMessage) {
     return;
   }
@@ -30,7 +32,7 @@ export async function before(messageUpdate, chatUpdate) {
   const userJid = jidNormalizedUser(this.authState.creds.me.id);
   const voterJid = getKeyAuthor(messageUpdate.key, userJid);
   const pollCreatorJid = getKeyAuthor(pollCreationKey, userJid);
-  const pollEncKey = pollCreationMessage.messageContextInfo?.messageSecret;
+  const pollEncKey = pollCreationMessage!!.messageContextInfo?.messageSecret;
 
   const decryptedVote = decryptPollVote(normalizedMessage!!.pollUpdateMessage!!.vote as any, {
     pollEncKey,

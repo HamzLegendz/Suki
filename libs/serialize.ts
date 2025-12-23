@@ -28,7 +28,6 @@ import util, { format } from "node:util";
 import { fileTypeFromBuffer } from "file-type";
 import { toAudio } from "./converter";
 import { Jimp, JimpMime } from "jimp";
-import store from "./store.ts";
 import type { ExtendedWASocket } from "../types/extendWASocket";
 import type { ExtendedWAMessage } from "../types/extendWAMessage";
 
@@ -1951,7 +1950,6 @@ END:VCARD`.trim();
       : {}),
   });
   if (sock.user?.id) sock.user.jid = sock.decodeJid(sock.user.id);
-  store.bind(sock);
   return sock as ExtendedWASocket;
 }
 

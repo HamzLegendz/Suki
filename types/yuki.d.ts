@@ -1,4 +1,5 @@
 import type { ExtendedWASocket } from "../types/extendWASocket";
+import type { Store } from "libs/store";
 import { commandCache } from "../libs/commandCache";
 
 
@@ -9,6 +10,7 @@ declare global {
   var prefix: any;
   var commandCache: CommandCache;
   var db: Low<any>;
+  var store: Store;
   var startupTime: number;
   var isProcessingPending: boolean;
   var pendingMessagesCount: number;

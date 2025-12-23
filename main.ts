@@ -1,5 +1,5 @@
 import "./config"
-import { Browsers, DisconnectReason, makeCacheableSignalKeyStore, useMultiFileAuthState, type UserFacingSocketConfig } from 'baileys';
+import { Browsers, DisconnectReason, getAggregateVotesInPollMessage, makeCacheableSignalKeyStore, useMultiFileAuthState, type UserFacingSocketConfig } from 'baileys';
 import { Low, JSONFile } from 'lowdb';
 import path from 'path';
 import pino from 'pino';
@@ -16,6 +16,7 @@ import { commandCache } from "./libs/commandCache";
 import { yukiKeepMatcher, yukiKeepParser } from "libs/yukiKeepParser";
 import { CleanupManager } from "libs/cleanupManager";
 import { MemoryMonitor } from "libs/MemoryMonitor";
+import { bind } from "libs/store";
 
 function filename(metaUrl = import.meta.url) {
   return fileURLToPath(metaUrl)
@@ -75,11 +76,36 @@ const connOptions: UserFacingSocketConfig = {
 
 global.conn = makeWASocket(connOptions);
 conn.isInit = false;
-conn.isShuttingDown = false;
-global.startupTime = Date.now();
-global.isProcessingPending = false;
-global.pendingMessagesCount = 0;
-global.lastPendingMessageTime = 0;
+global.store = bind(global.conn as any)
+
+async function getMessage() {
+  if (global.store) {
+    return store.messages
+  }
+
+  return {
+    conversation: "DitzDev",
+  }
+}
+
+conn.ev.on("messages.update", async (chatUpdate) => {
+  for (const { key, update } of chatUpdate) {
+    if (update.pollUpdates && key.fromMe) {
+      const pollCreation = await getMessage();
+      if (pollCreation) {
+        const pollUpdate = getAggregateVotesInPollMessage({
+          message: pollCreation,
+          pollUpdates: update.pollUpdates
+        });
+
+        var toCmd = pollUpdate.filter(v => v.voters.length !== 0)[0]?.name;
+        if (toCmd == undefined) return;
+        var prefCmd = prefix + toCmd;
+        conn.appenTextMessage(prefCmd, chatUpdate)
+      }
+    }
+  }
+})
 
 const cleanupManager = new CleanupManager();
 const memoryMonitor = new MemoryMonitor(conn.logger, cleanupManager, {
@@ -129,19 +155,12 @@ async function connectionUpdate(update: any) {
 
   if (isNewLogin) {
     conn.isInit = true;
-    global.startupTime = Date.now();
-    global.isProcessingPending = false;
-    global.pendingMessagesCount = 0;
-    global.lastPendingMessageTime = 0;
   }
 
-  if (connection == 'connecting') {    
+  if (connection == 'connecting') {
     conn.logger.warn('Activating Bot, Please wait a moment...');
-    global.isProcessingPending = false;
-    global.pendingMessagesCount = 0;
   } else if (connection == 'open') {
     conn.logger.info('Connected... ✓');
-    global.startupTime = Date.now();
   }
 
   if (isOnline == true) {
@@ -151,31 +170,6 @@ async function connectionUpdate(update: any) {
   }
 
   if (receivedPendingNotifications) {
-    global.isProcessingPending = true;
-    global.pendingMessagesCount = 0;
-    global.lastPendingMessageTime = Date.now();
-    conn.logger.warn('Processing pending messages...');
-    const checkInterval = setInterval(() => {
-      const timeSinceLastPending = Date.now() - global.lastPendingMessageTime;
-   
-      if (timeSinceLastPending > 5000) {
-        clearInterval(checkInterval);
-        global.isProcessingPending = false;
-        global.startupTime = Date.now();
-        conn.logger.info(`Processed ${global.pendingMessagesCount} pending messages. Ready for new messages ✓`);
-        global.pendingMessagesCount = 0;
-      }
-    }, 1000);
-    
-    setTimeout(() => {
-      if (global.isProcessingPending) {
-        clearInterval(checkInterval);
-        global.isProcessingPending = false;
-        global.startupTime = Date.now();
-        conn.logger.warn(`Timeout: Force stopped processing pending messages after processing ${global.pendingMessagesCount} messages`);
-        global.pendingMessagesCount = 0;
-      }
-    }, 60000);
     conn.logger.warn('Waiting for New Messages...');
   }
 
@@ -513,37 +507,6 @@ function setupTmpCleanup() {
         let deletedCount = 0;
         let keptCount = 0;
         let deletedSize = 0;
-
-        const results = await Promise.allSettled(
-          files.map(async (file: string) => {
-            if (file === '.yuki_keep') {
-              keptCount++;
-              return;
-            }
-
-            const filePath = path.join(tmpPath, file);
-
-            try {
-              if (yukiKeepMatcher.shouldKeep(file, filePath, currentConfig.keepRules)) {
-                keptCount++;
-                return;
-              }
-
-              if (yukiKeepMatcher.shouldDelete(file, filePath, currentConfig.deleteRules)) {
-                const stats = fs.statSync(filePath);
-                const fileSize = stats.size;
-
-                await fs.promises.rm(filePath, { recursive: true, force: true });
-                deletedCount++;
-                deletedSize += fileSize;
-              } else {
-                keptCount++;
-              }
-            } catch (err) {
-              conn.logger.error(`Failed to process ${file}: ${err}`);
-            }
-          })
-        );
 
         const formatSize = (bytes: number): string => {
           if (bytes < 1024) return `${bytes}B`;
