@@ -206,11 +206,68 @@ export function makeWASocket(
   config: UserFacingSocketConfig,
   options: any = {},
 ): ExtendedWASocket {
-  let conn: any = _makeWASockets(config);
+  let conn: any = _makeWASockets(config);  
+  
+  const originalUserDescriptor = Object.getOwnPropertyDescriptor(conn, 'user');
+  const userState = {
+    cleanLid: null as string | null
+  };
+  
   const sock = Object.defineProperties(conn, {
     chats: {
       value: { ...(options.chats || {}) },
       writable: true,
+    },
+    user: {
+      get() {
+        let originalUser;
+      
+        if (originalUserDescriptor?.get) {
+          originalUser = originalUserDescriptor.get.call(conn);
+        } else if (originalUserDescriptor?.value) {
+          originalUser = originalUserDescriptor.value;
+        } else {
+          originalUser = conn._user || conn.__user;
+        }
+      
+        if (!originalUser) return originalUser;
+
+        return {
+          ...originalUser,
+          lid: userState.cleanLid || originalUser.lid?.replace(/:\d+@/g, '@') || originalUser.lid
+        };
+      },
+      set(value) {
+        if (originalUserDescriptor?.set) {
+          originalUserDescriptor.set.call(conn, value);
+        } else {
+          conn._user = value;
+        }
+      },
+      enumerable: true,
+      configurable: true
+    },
+    _updateCleanLid: {
+      async value() {
+        let originalUser;
+        if (originalUserDescriptor?.get) {
+          originalUser = originalUserDescriptor.get.call(conn);
+        } else if (originalUserDescriptor?.value) {
+          originalUser = originalUserDescriptor.value;
+        } else {
+          originalUser = conn._user;
+        }
+      
+        if (originalUser?.lid) {
+          try {
+            userState.cleanLid = await conn.getLid(originalUser.lid);
+          } catch (error) {
+            conn.logger?.error?.('Failed to update clean LID:', error);
+            userState.cleanLid = originalUser.lid.replace(/:\d+@/g, '@');
+          }
+        }
+      },
+      enumerable: false
     },
     decodeJid: {
       value(jid: any) {
@@ -1957,6 +2014,9 @@ END:VCARD`.trim();
       : {}),
   });
   if (sock.user?.id) sock.user.jid = sock.decodeJid(sock.user.id);
+  if (conn.user?.lid) {
+     conn._updateCleanLid();
+  }
   return sock as ExtendedWASocket;
 }
 

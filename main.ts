@@ -244,7 +244,12 @@ global.reloadHandler = async function(restatConn: boolean) {
 
   conn.handler = handler.handler.bind(global.conn)
   conn.connectionUpdate = connectionUpdate.bind(global.conn)
-  conn.credsUpdate = saveCreds.bind(global.conn)
+  conn.credsUpdate = async function() {
+    await saveCreds.call(global.conn);
+    if (global.conn._updateCleanLid) {
+      await global.conn._updateCleanLid();
+    }
+  }.bind(global.conn);
   conn.participantsUpdate = handler.participantsUpdate.bind(global.conn)
   conn.groupsUpdate = handler.groupsUpdate.bind(global.conn)
 

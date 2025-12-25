@@ -24,7 +24,7 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
     m.exp = 0;
     m.limit = false;
     try {
-      initializeDatabase(m, await this.getLid(this.user.lid));
+      initializeDatabase(m, this.user.lid);
     } catch (e) {
       console.error(e)
     }
@@ -79,14 +79,13 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
     let _user = global.db.data && global.db.data.users && global.db.data.users[m.sender]
     const groupMetadata = (m.isGroup ? (conn.chats[m.chat] || {}).metadata : {}) || {}
     const participants = (m.isGroup ? groupMetadata.participants : []) || []
-    const botLid = await this.getLid(this.user.id)
     let user: any
     let bot: any
 
     for (const p of participants) {
       const lid = await this.getLid(p.id)
       if (lid === senderLid) user = p
-      if (lid === botLid) bot = p
+      if (lid === this.user.lid) bot = p
     }
 
     const isRAdmin = user?.admin === 'superadmin'
