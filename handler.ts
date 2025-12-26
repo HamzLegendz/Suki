@@ -40,13 +40,15 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
     if (opts['swonly'] && m.chat !== 'status@broadcast') return;
     if (typeof m.text !== 'string') m.text = '';
     const body = typeof m.text == 'string' ? m.text : false;
+    if (!body || typeof body !== 'string' || body.length === 0) return;
+
     const senderLid = await this.getLid(m.sender)
 
     const ownerLids = await Promise.all([conn.decodeJid(this.user.id), ...global.owner.map(([number, _]) => number)].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').map(jid => this.getLid(jid)))
 
     const isROwner = ownerLids.includes(senderLid)
     const isOwner = isROwner || m.fromMe;
-    const modsLids = await Promise.all(global.mods.map((v: any) => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').map(jid => this.getLid(jid)))
+    const modsLids = await Promise.all(global.mods.map((v: any) => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').map((jid: string) => this.getLid(jid)))
     const isMods = isOwner || modsLids.includes(senderLid)
     const isPrems = isROwner || global.db.data.users[m.sender].premiumTime > 0;
     const isBans = global.db.data.users[m.sender].banned;
@@ -161,6 +163,7 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
           }) :
           typeof _prefix === 'string' ?
             [[new RegExp(str2Regex(_prefix)).exec(m.text), new RegExp(str2Regex(_prefix))]] :
+            // @ts-ignore
             [[[], new RegExp]]
       ).find(p => p[1]);
 
@@ -205,6 +208,8 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
         }
       } else {
         const hasPrefix = match && match[0] && match[0][0];
+
+        if (!hasPrefix && !m.text.match(/^[A-Za-z]/)) return;
 
         if (hasPrefix) {
           // There is a prefix, delete the prefix

@@ -48,17 +48,26 @@ export interface PluginHandler {
   rowner?: boolean;
   admin?: boolean;
   private?: boolean;
-  limit?: number | boolean;
+  limit?: number | boolean | any;
   exp?: number;
   level?: number;
   disabled?: boolean;
   customPrefix?: RegExp;
   usage?: string[] | RegExp;
+  fail?: string;
   exec: (
     m: ExtendedWAMessage,
     ctx: HandlerContext
   ) => Promise<any> | void;
   before?(
+    m: ExtendedWAMessage,
+    ctx: HandlerContext
+  ) => Promise<any> | void;
+  after?(
+    m: ExtendedWAMessage,
+    ctx: HandlerContext
+  ) => Promise<any> | void;
+  all?(
     m: ExtendedWAMessage,
     ctx: HandlerContext
   ) => Promise<any> | void;
