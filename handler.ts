@@ -54,7 +54,6 @@ export async function handler(chatUpdate: BaileysEventMap["messages.upsert"]) {
     const isBans = global.db.data.users[m.sender].banned;
 
     if (isROwner) {
-      global.db.data.users[m.sender].registered = true;
       global.db.data.users[m.sender].premium = true;
       global.db.data.users[m.sender].premiumDate = "infinity";
       global.db.data.users[m.sender].limit = "infinity";
