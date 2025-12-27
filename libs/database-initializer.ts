@@ -23,6 +23,7 @@ export function initializeUser(user: any, sender: string, m: any): void {
     }
     if (!isNumber(user.afk)) user.afk = -1;
     if (!('afkReason' in user)) user.afkReason = '';
+    if (!('password' in user)) user.password = '';
     if (!('banned' in user)) user.banned = false;
     if (!('bannedReason' in user)) user.bannedReason = '';
     if (!('premium' in user)) user.premium = false;
@@ -44,6 +45,7 @@ export function initializeUser(user: any, sender: string, m: any): void {
     afk: -1,
     banned: false,
     bannedReason: '',
+    password: '',
     premium: false,
     premiumDate: 0,
     autolevelup: true,
