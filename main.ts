@@ -373,6 +373,8 @@ let pluginFilter = (filename: string) => /\.ts$/.test(filename);
 
 global.reload = async (filename: string = "") => {
   if (!pluginFilter(filename)) return;
+  
+  if (filename.includes('_utils')) return;
 
   const relPath = path.relative(pluginFolder, filename);
   const fullPath = path.resolve(filename);
