@@ -121,12 +121,13 @@ _Processing sticker packs, this might take a while..._`.trim());
               '-lossless 0',
               `-q:v ${options.quality}`,
               '-compression_level 6',
-              '-preset fast',
+              '-preset picture',
               '-loop 0',
               '-an',
               '-vsync 0',
               `-t ${safeDuration.toFixed(2)}`,
               `-vf "scale=${options.scale}:${options.scale}:force_original_aspect_ratio=decrease,format=rgba,pad=${options.scale}:${options.scale}:(ow-iw)/2:(oh-ih)/2:color=#00000000,fps=${options.fps}"`,
+              '-pix_fmt yuva420p',
               `"${tmpFileOut}"`
             ].join(' ');
 
@@ -158,7 +159,12 @@ _Processing sticker packs, this might take a while..._`.trim());
             { scale: 420, fps: 8, quality: 30 },
             { scale: 400, fps: 7, quality: 25 },
             { scale: 380, fps: 6, quality: 20 },
-            { scale: 350, fps: 5, quality: 18 }
+            { scale: 350, fps: 5, quality: 18 },
+            { scale: 320, fps: 6, quality: 40 },
+            { scale: 300, fps: 5, quality: 35 },
+            { scale: 280, fps: 5, quality: 30 },
+            { scale: 256, fps: 4, quality: 25 },
+            { scale: 240, fps: 4, quality: 20 }
           ];
 
           let buff: Buffer | null = null;
@@ -204,7 +210,11 @@ _Processing sticker packs, this might take a while..._`.trim());
           { quality: 35, size: 512 },
           { quality: 25, size: 512 },
           { quality: 20, size: 480 },
-          { quality: 15, size: 450 }
+          { quality: 15, size: 450 },
+          { quality: 10, size: 420 },
+          { quality: 8, size: 400 },
+          { quality: 5, size: 380 },
+          { quality: 3, size: 350 }
         ];
 
         for (let attempt of attempts) {
@@ -213,12 +223,12 @@ _Processing sticker packs, this might take a while..._`.trim());
           if (isAnimated) {
             result = await sharp(buffer, { animated: true })
               .resize(attempt.size, attempt.size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-              .webp({ quality: attempt.quality, effort: 3 })
+              .webp({ quality: attempt.quality, effort: 6, smartSubsample: true, nearLossless: false })
               .toBuffer();
           } else {
             result = await sharp(buffer)
               .resize(attempt.size, attempt.size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-              .webp({ quality: attempt.quality, effort: 3 })
+              .webp({ quality: attempt.quality, effort: 6, smartSubsample: true })
               .toBuffer();
           }
         }
@@ -228,6 +238,53 @@ _Processing sticker packs, this might take a while..._`.trim());
         }
 
         return result;
+      };
+
+      const getThumbnailAsFallback = async (stickerData: any): Promise<Buffer | null> => {
+        try {
+          const thumbnailFileId = stickerData.thumbnail?.file_id || stickerData.thumb?.file_id;
+          
+          if (!thumbnailFileId) {
+            console.log(`No thumbnail available`);
+            return null;
+          }
+
+          console.log(`Trying thumbnail fallback...`);
+
+          let fetchThumbId = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${thumbnailFileId}`);
+          let thumbJson: any = await fetchThumbId.json();
+
+          if (!thumbJson.ok) {
+            console.log(`Thumbnail fetch failed`);
+            return null;
+          }
+
+          let thumbUrl = `https://api.telegram.org/file/bot${botToken}/${thumbJson.result.file_path}`;
+          let thumbBuffer = await downloadBuffer(thumbUrl);
+          let thumbFileType = await fileTypeFromBuffer(thumbBuffer);
+
+          let processedThumb: Buffer;
+
+          if (thumbFileType?.mime === "image/webp") {
+            processedThumb = thumbBuffer;
+          } else {
+            processedThumb = await imageToWebp({
+              data: thumbBuffer,
+              mimetype: thumbFileType?.mime
+            });
+          }
+
+          if (processedThumb.length > MAX_SIZE) {
+            processedThumb = await compressWebP(processedThumb, false);
+          }
+
+          console.log(`Thumbnail fallback successful (${(processedThumb.length / 1024).toFixed(2)}KB)`);
+          return processedThumb;
+
+        } catch (e: any) {
+          console.log(`Thumbnail fallback failed:`, e.message);
+          return null;
+        }
       };
 
       let coverBuffer: Buffer | null = null;
@@ -284,13 +341,14 @@ _Processing sticker packs, this might take a while..._`.trim());
       let allStickers: any = [];
       let successCount = 0;
       let failedCount = 0;
+      let fallbackCount = 0;
 
       for (let i = 0; i < json.result.stickers.length; i++) {
         try {
           let stickerData = json.result.stickers[i];
           let fileId = stickerData.file_id;
-
-          if (stickerData.is_animated) {
+          
+          if (stickerData.is_animated) {  
             failedCount++;
             continue;
           }
@@ -302,42 +360,64 @@ _Processing sticker packs, this might take a while..._`.trim());
             let fileUrl = `https://api.telegram.org/file/bot${botToken}/${stickerRJson.result.file_path}`;
             let stickerBuffer = await downloadBuffer(fileUrl);
             let fileType = await fileTypeFromBuffer(stickerBuffer);
+            
+            let processedBuffer: Buffer | null = null;
+            let usedFallback = false;
 
-            let processedBuffer: Buffer;
+            try {
+              if (fileType?.mime === "video/webm") {
+                processedBuffer = await videoToWebpCompressed(stickerBuffer);
+              } else if (fileType?.mime === "image/webp") {
+                let metadata = await sharp(stickerBuffer, { animated: true }).metadata().catch(() => sharp(stickerBuffer).metadata());
+                let isAnimated = (metadata.pages || 1) > 1;
+                
+                processedBuffer = stickerBuffer;
 
-            if (fileType?.mime === "video/webm") {
-              processedBuffer = await videoToWebpCompressed(stickerBuffer);
-            } else if (fileType?.mime === "image/webp") {
-              let metadata = await sharp(stickerBuffer, { animated: true }).metadata().catch(() => sharp(stickerBuffer).metadata());
-              let isAnimated = (metadata.pages || 1) > 1;
+                if (processedBuffer.length > MAX_SIZE) {
+                  processedBuffer = await compressWebP(processedBuffer, isAnimated);
+                }
+              } else {
+                processedBuffer = await imageToWebp({
+                  data: stickerBuffer,
+                  mimetype: fileType?.mime
+                });
 
-              processedBuffer = stickerBuffer;
+                if (processedBuffer.length > MAX_SIZE) {
+                  processedBuffer = await compressWebP(processedBuffer, false);
+                }
+              }
 
-              if (processedBuffer.length > MAX_SIZE) {
-                processedBuffer = await compressWebP(processedBuffer, isAnimated);
+              if (processedBuffer && processedBuffer.length > MAX_SIZE) {
+                throw new Error(`Still too large after compression: ${(processedBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+              }
+            } catch (processingError: any) {
+              console.log(`Processing failed: ${processingError.message}`);
+              
+              processedBuffer = await getThumbnailAsFallback(stickerData);
+              
+              if (processedBuffer) {
+                usedFallback = true;
+              } else {
+                throw processingError;
+              }
+            }
+
+            if (processedBuffer && processedBuffer.length <= MAX_SIZE) {
+              allStickers.push({ data: processedBuffer });
+              successCount++;
+              if (usedFallback) {
+                fallbackCount++;
               }
             } else {
-              processedBuffer = await imageToWebp({
-                data: stickerBuffer,
-                mimetype: fileType?.mime
-              });
-
-              if (processedBuffer.length > MAX_SIZE) {
-                processedBuffer = await compressWebP(processedBuffer, false);
-              }
-            }
-
-            if (processedBuffer.length > MAX_SIZE) {
+              console.log(`  ❌ Could not process or fallback`);           
               failedCount++;
-              continue;
             }
-
-            allStickers.push({ data: processedBuffer });
-            successCount++;
           } else {
+            console.log(`  ❌ API error: ${stickerRJson.description || 'Unknown'}`);            
             failedCount++;
           }
         } catch (e: any) {
+          console.error(`  ❌ Error:`, e.message || e);          
           failedCount++;
         }
       }
@@ -365,7 +445,7 @@ _Processing sticker packs, this might take a while..._`.trim());
             packId: String(Date.now() + i),
             description: `Sticker pack from Telegram: ${packName}`
           }
-        });
+        }, { quoted: m });
 
         if (i < stickerPacks.length - 1) {
           await new Promise(r => setTimeout(r, 1000));
@@ -375,9 +455,13 @@ _Processing sticker packs, this might take a while..._`.trim());
       const packInfo = stickerPacks.length > 1 
         ? `\n*Split into:* ${stickerPacks.length} packs`
         : '';
+      
+      const fallbackInfo = fallbackCount > 0
+        ? `\n*Thumbnail fallback:* ${fallbackCount} sticker`
+        : '';
 
       m.reply(`✅ *Finished!*
-*Succeed:* ${successCount} sticker${packInfo}
+*Succeed:* ${successCount} sticker${packInfo}${fallbackInfo}
 *Fail:* ${failedCount} sticker`)
 
       m.react("✅");
@@ -385,7 +469,17 @@ _Processing sticker packs, this might take a while..._`.trim());
     } catch (e: any) {
       console.error("Process error:", e);
       m.react("❌");
-      throw `❌ Failed to process sticker pack: ${e.message}`;
+      let errorMsg = "Unknown error";
+      if (e instanceof Error) {
+        errorMsg = e.message;
+      } else if (typeof e === 'string') {
+        errorMsg = e;
+      } else if (e && typeof e === 'object') {
+        errorMsg = e.message || e.error || e.toString();
+      }
+  
+      throw `❌ Failed to process sticker pack: ${errorMsg}`;
+
     } finally {
       delete conn!!.stickerTeleProcessing[m.sender];
     }
