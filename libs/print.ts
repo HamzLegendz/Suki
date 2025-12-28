@@ -22,7 +22,8 @@ try {
 
 export default async function print(m: ExtendedWAMessage, conn: any, _user?: any) {
   const _name = await conn.getName(m.sender);
-  const sender = PhoneNumber('+' + m.sender.replace('@s.whatsapp.net', '')).getNumber('international') + (_name ? ' ~' + _name : '');
+  const senderJid = await conn.getJid(m.sender);
+  const sender = PhoneNumber('+' + senderJid.replace('@s.whatsapp.net', '')).getNumber('international') + (_name ? ' ~' + _name : '');
   const chat = await conn.getName(m.chat);
 
   const filesize = (m.msg ?
@@ -38,7 +39,7 @@ export default async function print(m: ExtendedWAMessage, conn: any, _user?: any
     : m.text ? m.text.length : 0) || 0;
 
   const user = global.db.data.users[sender] || global.db.data.users[m.sender];
-  const me = PhoneNumber('+' + ((conn as any).user.jid || '').replace('@s.whatsapp.net', '')).getNumber('international');
+  const me = PhoneNumber('+' + (await conn.getJid(conn.user.lid) || '').replace('@s.whatsapp.net', '')).getNumber('international');
 
   console.log(`
 ╭┈❲ ${chalk.redBright('%s')}
